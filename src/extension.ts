@@ -28,6 +28,7 @@ import { buildContextChunks, packContext } from "./core/context/contextBuilder";
 import { loadNexusRules } from "./core/rules/rulesLoader";
 import type {
   AppState,
+  AttachmentRef,
   ChatMessage,
   McpToolDescriptor,
   ModelInfo,
@@ -339,7 +340,7 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
       post({ type: "state/patch", patch: { currentMode: msg.modeId } });
       return;
     case "task/start":
-      await startTask(msg.prompt, msg.modeId, msg.providerId, msg.modelId, deps);
+      await startTask(msg.prompt, msg.modeId, msg.providerId, msg.modelId, deps, msg.attachments);
       return;
     case "task/stop": {
       const c = deps.runnerDeps.getActiveRun();
@@ -397,7 +398,7 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
     case "queue/sendNow": {
       const popped = deps.runnerDeps.queueManager.sendNow(msg.itemId, msg.behavior);
       if (popped) {
-        await startTask(popped.item.text, popped.item.modeOverride, popped.item.providerOverride, popped.item.modelOverride, deps);
+        await startTask(popped.item.text, popped.item.modeOverride, popped.item.providerOverride, popped.item.modelOverride, deps, popped.item.attachments);
       }
       return;
     }
@@ -413,6 +414,7 @@ async function startTask(
   providerId: string | undefined,
   modelId: string | undefined,
   deps: MessageDeps,
+  attachments?: AttachmentRef[],
 ): Promise<void> {
   const { post, runnerDeps } = deps;
   if (runnerDeps.getActiveRun()) {
@@ -453,7 +455,13 @@ async function startTask(
     modelId: effectiveModelId,
     activeSkills: matchedSkills.map((s) => s.id),
   });
-  const userMessage: ChatMessage = { id: `u_${Date.now()}`, role: "user", content: prompt, ts: Date.now() };
+  const userMessage: ChatMessage = {
+    id: `u_${Date.now()}`,
+    role: "user",
+    content: prompt,
+    ts: Date.now(),
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
+  };
   runnerDeps.taskManager.appendMessage(task.id, userMessage);
   post({ type: "task/message", message: userMessage });
 
@@ -475,6 +483,7 @@ async function startTask(
         apiKey,
         modelId: effectiveModelId,
         policy: settings.approvalPolicy,
+        attachments,
       },
       {
         toolRegistry: runnerDeps.toolRegistry,

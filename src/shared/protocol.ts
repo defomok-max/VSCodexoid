@@ -4,6 +4,7 @@
 import type {
   AppState,
   ApprovalDecision,
+  AttachmentRef,
   ChatMessage,
   DiffPreviewFile,
   McpServerConfig,
@@ -20,7 +21,7 @@ import type {
 
 export type WebviewToHost =
   | { type: "ui/ready" }
-  | { type: "task/start"; prompt: string; modeId?: string; providerId?: string; modelId?: string; sendBehavior?: QueueSendBehavior }
+  | { type: "task/start"; prompt: string; modeId?: string; providerId?: string; modelId?: string; sendBehavior?: QueueSendBehavior; attachments?: AttachmentRef[] }
   | { type: "task/stop" }
   | { type: "task/pause" }
   | { type: "task/resume"; taskId?: string }

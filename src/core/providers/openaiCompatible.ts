@@ -8,6 +8,7 @@ import type {
 import { ProviderError } from "./providerTypes";
 import type { ChatMessage, ModelInfo, ProviderProfile } from "../../shared/types";
 import { readSseEvents } from "./util/sse";
+import { hasImages, toOpenAIContentBlocks } from "./util/multimodal";
 
 /**
  * Generic OpenAI-compatible adapter. Handles the `/v1/chat/completions` shape
@@ -181,7 +182,12 @@ export class OpenAICompatibleProvider implements LLMProvider {
 }
 
 function toOpenAIMessage(m: ChatMessage): Record<string, unknown> {
-  const base: Record<string, unknown> = { role: m.role, content: m.content };
+  const base: Record<string, unknown> = { role: m.role };
+  if (m.role === "user" && hasImages(m)) {
+    base.content = toOpenAIContentBlocks(m);
+  } else {
+    base.content = m.content;
+  }
   if (m.role === "tool" && m.toolCallId) base.tool_call_id = m.toolCallId;
   if (m.toolCalls && m.toolCalls.length > 0) {
     base.tool_calls = m.toolCalls.map((tc) => ({

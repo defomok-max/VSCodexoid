@@ -93,6 +93,14 @@ export interface AttachmentRef {
   url?: string;
   mimeType?: string;
   bytes?: number;
+  /**
+   * Base64-encoded raw bytes for `kind: "image"` (without the
+   * `data:<mime>;base64,` prefix). Vision-capable providers serialize this
+   * into their native multimodal content shape.
+   */
+  dataBase64?: string;
+  /** Optional human-readable filename, surfaced in chat thumbnails. */
+  name?: string;
 }
 
 export interface ToolCallRef {
