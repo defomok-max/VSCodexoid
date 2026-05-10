@@ -20,6 +20,8 @@ import { SkillRegistry } from "./core/skills/skillRegistry";
 import { BUILT_IN_SKILLS } from "./core/skills/builtInSkills";
 import { loadProjectSkills } from "./core/skills/skillLoader";
 import { McpManager } from "./core/mcp/mcpManager";
+import { McpConfigStore } from "./core/storage/mcpConfigStore";
+import { reconcileMcpLifecycle, restartMcpServer } from "./core/mcp/mcpLifecycle";
 import { CheckpointManager } from "./core/checkpoint/checkpointManager";
 import { WorkspaceIndex } from "./core/indexing/workspaceIndex";
 import { QueueManager } from "./core/agent/queueManager";
@@ -82,6 +84,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const mcpTools: McpToolDescriptor[] = [];
   const mcpManager = new McpManager();
+  const mcpConfigStore = new McpConfigStore(context.globalState, wsRoot);
+  let mcpServers: import("./shared/types").McpServerConfig[] = [];
   mcpManager.setListeners({
     tools: (descriptors) => {
       mcpTools.length = 0;
@@ -164,7 +168,7 @@ export function activate(context: vscode.ExtensionContext): void {
     models: { ...modelCache },
     modes: builtInModes,
     skills: skillRegistry.list(),
-    mcpServers: [],
+    mcpServers: [...mcpServers],
     mcpTools: [...mcpTools],
     currentMode: currentModeId,
     currentTask: taskManager.current(),
@@ -243,6 +247,11 @@ export function activate(context: vscode.ExtensionContext): void {
     approvalGate,
     checkpointManager,
     mcpManager,
+    mcpConfigStore,
+    getMcpServers: () => [...mcpServers],
+    setMcpServers: (s) => {
+      mcpServers = s;
+    },
     sessionStore,
     workspaceIndex,
     workspaceRoot: wsRoot,
@@ -262,6 +271,20 @@ export function activate(context: vscode.ExtensionContext): void {
   void buildSecurityBridge;
 
   context.subscriptions.push({ dispose: () => void mcpManager.stopAll() });
+
+  // Hydrate MCP config + auto-start runnable servers.
+  void (async () => {
+    try {
+      mcpServers = await mcpConfigStore.read();
+      post({ type: "state/patch", patch: { mcpServers: [...mcpServers] } });
+      const summary = await reconcileMcpLifecycle(mcpManager, mcpServers);
+      if (summary.started || summary.stopped) {
+        logger.info(`mcp lifecycle: started ${summary.started}, stopped ${summary.stopped}`);
+      }
+    } catch (e) {
+      logger.warn(`mcp hydrate failed: ${(e as Error).message}`);
+    }
+  })();
 
   logger.info("NexusCode Agent activated");
 }
@@ -307,6 +330,9 @@ interface RunnerDeps {
   approvalGate: ApprovalGate;
   checkpointManager: CheckpointManager;
   mcpManager: McpManager;
+  mcpConfigStore: McpConfigStore;
+  getMcpServers: () => import("./shared/types").McpServerConfig[];
+  setMcpServers: (s: import("./shared/types").McpServerConfig[]) => void;
   sessionStore: SessionStore;
   workspaceIndex: WorkspaceIndex | undefined;
   workspaceRoot: string | undefined;
@@ -461,6 +487,63 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
           level: "error",
           message: `Command "${msg.command}" failed: ${(e as Error).message}`,
         });
+      }
+      return;
+    }
+    case "mcp/save": {
+      // Persist user-scope only; project-file entries are read-only and
+      // re-merged on the next read().
+      await deps.runnerDeps.mcpConfigStore.write(msg.servers);
+      const merged = await deps.runnerDeps.mcpConfigStore.read();
+      deps.runnerDeps.setMcpServers(merged);
+      const summary = await reconcileMcpLifecycle(deps.runnerDeps.mcpManager, merged);
+      logger.info(`mcp/save: started ${summary.started}, stopped ${summary.stopped}`);
+      post({ type: "state/patch", patch: { mcpServers: merged } });
+      post({
+        type: "toast",
+        level: "success",
+        message: `MCP servers saved (${summary.started} started, ${summary.stopped} stopped).`,
+      });
+      return;
+    }
+    case "mcp/restart": {
+      const cfg = deps.runnerDeps.getMcpServers().find((s) => s.id === msg.serverId);
+      if (!cfg) {
+        post({ type: "toast", level: "error", message: `MCP server ${msg.serverId} not found.` });
+        return;
+      }
+      await restartMcpServer(deps.runnerDeps.mcpManager, cfg);
+      post({ type: "toast", level: "info", message: `MCP server ${cfg.name ?? cfg.id} restarted.` });
+      return;
+    }
+    case "mcp/test": {
+      const cfg = deps.runnerDeps.getMcpServers().find((s) => s.id === msg.serverId);
+      if (!cfg) {
+        post({ type: "toast", level: "error", message: `MCP server ${msg.serverId} not found.` });
+        return;
+      }
+      const wasRunning = deps.runnerDeps.mcpManager.getClient(cfg.id)?.isRunning() ?? false;
+      try {
+        if (!wasRunning) await deps.runnerDeps.mcpManager.startServer(cfg);
+        const client = deps.runnerDeps.mcpManager.getClient(cfg.id);
+        if (!client) throw new Error("server failed to start");
+        const tools = await client.listTools();
+        post({
+          type: "toast",
+          level: "success",
+          message: `MCP ${cfg.name ?? cfg.id} OK — ${tools.tools.length} tool(s).`,
+        });
+      } catch (e) {
+        post({
+          type: "toast",
+          level: "error",
+          message: `MCP ${cfg.name ?? cfg.id} test failed: ${(e as Error).message}`,
+        });
+      } finally {
+        if (!wasRunning) {
+          // Don't leave an unrequested server running after a probe.
+          await deps.runnerDeps.mcpManager.stopServer(cfg.id).catch(() => {});
+        }
       }
       return;
     }

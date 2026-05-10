@@ -155,8 +155,16 @@ The final PR target is `dev → main`.
   - `webview/components/common/TrustBanner.tsx` — persistent amber banner under TopBar when `state.workspaceTrusted === false`. "Manage trust" button opens the built-in `workbench.trust.manage` dialog via the `command/run` round-trip.
   - `core/security/commandAllowlist.ts` — `ALLOWED_WEBVIEW_COMMANDS` set (`workbench.trust.manage`, `workbench.action.openSettings`, `workbench.action.reloadWindow`) + `isAllowedWebviewCommand(cmd)` helper.
   - `extension.ts` `command/run` handler (was declared in Stage 1 but never wired) — consults the allowlist, calls `vscode.commands.executeCommand`, surfaces failures as toasts.
-  - +5 vitest tests in `tests/commandAllowlist.test.ts`. **221 total** on top of stage-19 (216 + 5).
-  - Stacks on Stage 19. Once Stage 19 lands on `main`, this PR rebases trivially.
+  - +5 vitest tests in `tests/commandAllowlist.test.ts`.
+
+- [x] **Stage 21 — MCP server lifecycle**
+  - `core/storage/mcpConfigStore.ts` — persists user-scope MCP server configs in `globalState["nexus.mcpServers"]`; optionally merges read-only entries from `<workspace>/.nexus/mcp.json` (project entries override user entries by id). Writes never touch the project file.
+  - `core/mcp/mcpLifecycle.ts` — `reconcileMcpLifecycle(manager, desired)` diffs against `manager.runningServerIds()` and applies minimum start/stop calls (server runnable iff `enabled && autoStart !== false`). `restartMcpServer(manager, cfg)` for the `mcp/restart` UI action.
+  - `McpManager.runningServerIds()` — required primitive.
+  - `extension.ts` activation hydrate: load merged server list → broadcast via `state.mcpServers` → reconcile lifecycle so `autoStart` servers come online.
+  - Webview message handlers wired: `mcp/save` (persist + reconcile + broadcast + toast counts), `mcp/restart` (find cfg → `restartMcpServer`), `mcp/test` (start-if-needed → `listTools` → toast tool count → stop if it wasn't running before the probe).
+  - +9 vitest tests in `tests/mcpLifecycle.test.ts`.
+  - Together with Stage 20 (MCP tool execution), this completes the MCP loop: configured server starts on activate → its tools register in `toolRegistry` → agent can call them under mode / skill / workspace-trust filters.
 
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.

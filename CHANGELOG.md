@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `workbench.trust.manage`, `workbench.action.openSettings`, and
   `workbench.action.reloadWindow`.
 - **5 new vitest tests** in `tests/commandAllowlist.test.ts`.
+- **MCP server lifecycle.** User MCP server configs persist in
+  `globalState`, optional `.nexus/mcp.json` project entries are merged
+  read-only, runnable servers auto-start on activation, and `mcp/save`,
+  `mcp/restart`, `mcp/test` handlers manage the running set.
+- **9 new vitest tests** in `tests/mcpLifecycle.test.ts`.
 
 ### Notes
 - Mode preference intentionally stays out of `nexus.*` settings, avoiding
@@ -34,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   from the LLM before tool descriptors are sent.
 - The webview cannot run arbitrary VS Code commands; `command/run` is scoped to
   the explicit allowlist above.
+- `.nexus/mcp.json` accepts either a top-level array or `{ "servers": [...] }`;
+  project entries override user entries by id and are never written by the UI.
 
 ## [0.1.0+stage18] — Stage 18: Queue persistence
 
