@@ -5,6 +5,36 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 23: Persisted current-mode preference
+
+### Added
+- **`core/storage/preferencesStore.ts`** — a thin `vscode.Memento`-
+  backed bucket for ephemeral UI preferences that don't fit into
+  `nexus.*` settings (those are user-editable from the Settings UI) and
+  don't fit into task history. Exposes `NexusPreferences`,
+  `read()`, `update(partial)` (merge-on-write; `undefined` means
+  remove), and `clear()`. Tolerates corrupt persisted values — a
+  non-object snapshot reads back as `{}` rather than crashing.
+- **`extension.ts`** now reads `preferencesStore.read().currentMode` on
+  activate and writes the new value through `setCurrentMode`. Without
+  this, switching to e.g. `architect` reset to `code` on every reload,
+  which surprised users who don't work in `code` mode by default.
+- **+6 vitest tests** in `tests/preferencesStore.test.ts` covering empty
+  read, persist + read-back across a fresh store instance, merge
+  semantics, `undefined`-as-remove, `clear`, and the corrupt-snapshot
+  fallback. **Total: 216 passing** on top of `main` (210 + 6 new).
+
+### Notes
+- The store is intentionally schema-permissive (`NexusPreferences` is
+  a record of optional fields). Future preferences (e.g. last-used
+  provider/model picker selection, sidebar width) just add new optional
+  fields — no migration needed.
+- We deliberately do **not** put `currentMode` into
+  `nexus.*` settings: those are workspace-overridable and live in
+  `.vscode/settings.json`, which would expose every developer's
+  per-session mode choice in the diff. The memento is global per VS Code
+  install, which matches how this preference is actually used.
+
 ## [Unreleased] — Stage 17d: Multimodal / image input
 
 ### Added

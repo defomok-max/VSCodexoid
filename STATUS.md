@@ -128,6 +128,12 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 23 — Persisted current-mode preference**
+  - `core/storage/preferencesStore.ts` — thin Memento bucket (`globalState["nexus.preferences"]`) for ephemeral UI preferences. `read()`, merge-on-write `update(partial)` (`undefined` = remove), `clear()`. Tolerates corrupt snapshots (non-object reads back as `{}`).
+  - `extension.ts` reads `preferencesStore.read().currentMode` on activate (default `"code"`), writes through `setCurrentMode`. Switching to non-default mode now survives reload.
+  - +6 vitest tests in `tests/preferencesStore.test.ts` → **216 total** on top of main (210 + 6).
+  - Schema-permissive: future preferences (last-used provider/model, sidebar width, …) add optional fields, no migration.
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.

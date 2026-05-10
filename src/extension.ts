@@ -3,6 +3,7 @@ import { buildToolUiBridge } from "./core/tools/uiBridgeAdapter";
 import { NexusWebviewProvider } from "./webview/webviewProvider";
 import { SettingsStore } from "./core/storage/settingsStore";
 import { SessionStore } from "./core/storage/sessionStore";
+import { PreferencesStore } from "./core/storage/preferencesStore";
 import { builtInModes } from "./core/modes/builtInModes";
 import { ProviderRegistry } from "./core/providers/providerRegistry";
 import { ProviderProfileStore } from "./core/providers/providerStore";
@@ -56,6 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const settingsStore = new SettingsStore();
   const sessionStore = new SessionStore(context.globalState);
+  const preferencesStore = new PreferencesStore(context.globalState);
   const providerProfileStore = new ProviderProfileStore(context.globalState);
   const providerSecretStore = new ProviderSecretStore(context.secrets);
   const providerRegistry = new ProviderRegistry();
@@ -137,7 +139,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  let currentModeId = "code";
+  // Restore the last-used mode (defaults to "code" on first launch). Without
+  // this, switching to e.g. "architect" gets reset every time the extension
+  // host reloads, which is surprising.
+  let currentModeId = preferencesStore.read().currentMode ?? "code";
 
   const buildState = (): AppState => ({
     ready: true,
@@ -217,6 +222,9 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     setCurrentMode: (id: string) => {
       currentModeId = id;
+      // Fire-and-forget: failing to persist is non-fatal (next reload would
+      // just see the previous mode); we log via the surrounding handler.
+      void preferencesStore.update({ currentMode: id });
     },
     getCurrentMode: () => currentModeId,
   };
