@@ -48,15 +48,21 @@ The final PR target is `dev → main`.
   - Patch engine — `generateHunks` (LCS line diff), `buildDiffPreview`, `applyHunkMask` (per-hunk accept/reject)
   - 37 new vitest tests → 54 total passing
 
-- [~] **Stage 4 — Context, skills, MCP, checkpoints**
-  - Context builder: `@file` / `@folder` / `@symbol` / `@terminal` / `@problems` / `@gitdiff` / `@openfiles` references
-  - Token budget manager (relevance ranking, summarization, ignore enforcement)
-  - `.nexusrules` loader
-  - Skills system: registry, loader (`.nexus/skills/*.skill.json`), 20 built-in skills, runner
-  - MCP stdio client + server manager + per-tool permissions + audit log
-  - Checkpoint manager (per-task patch store, rollback)
+- [x] **Stage 4 — Context, skills, MCP, checkpoints**
+  - `parseContextRefs` for `@file:` / `@folder:` / `@symbol:` / `@terminal` / `@problems` / `@gitdiff[:ref]` / `@openfiles`
+  - `buildContextChunks` resolves each reference to file content / folder listing / git diff / problems / open files; redacts secrets and honors `.nexusignore`
+  - `packContext` + `packBudget` + `estimateTokens` + `truncateToTokens` token-budget manager
+  - `.nexusrules` loader (also falls back to `.nexus/rules.md`); `buildRulesSection` for the system prompt
+  - `SkillRegistry` (register / unregister / list / `match(message)` by trigger substring)
+  - `loadProjectSkills` reads `.nexus/skills/**/*.skill.json` (graceful per-file errors)
+  - **20 built-in skills** — Add Feature, Fix Bug, Refactor, Explain Code, Write Tests, Review PR, Optimize Performance, Write Documentation, API Design, Security Audit, Dependency Audit, Git Commit, Create Branch, DevOps & CI, DB Migration, Frontend Component, API Endpoint, Microbenchmark, Localize, Notebook Cleanup
+  - `McpStdioClient` (Content-Length JSON-RPC framing, request correlation, timeouts, abort)
+  - `McpManager` (start / stop / aggregate tools, status events, listener wiring)
+  - `CheckpointManager` (per-task on-disk snapshots under `globalStorage`, restore, trim by max-count, survives extension restart)
+  - Skills + MCP + checkpoints wired into `extension.ts` activation; project skills auto-loaded from workspace
+  - +31 new vitest tests → 85 total passing
 
-- [ ] **Stage 5 — Agent loop**
+- [~] **Stage 5 — Agent loop**
   - Planner (collect context → produce plan → request approval)
   - Executor (tool loop with cancellation + token streaming)
   - Queue manager (queue/dequeue, reorder, send-now, auto-send next)

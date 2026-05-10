@@ -12,7 +12,12 @@ import { registerBuiltinTools } from "./core/tools/builtin";
 import { IgnoreMatcher, SAFE_DEFAULT_IGNORES } from "./core/security/ignoreMatcher";
 import { scanSecrets } from "./core/security/secretScanner";
 import { resolveWorkspacePath } from "./core/security/pathGuard";
-import type { AppState, ModelInfo } from "./shared/types";
+import { SkillRegistry } from "./core/skills/skillRegistry";
+import { BUILT_IN_SKILLS } from "./core/skills/builtInSkills";
+import { loadProjectSkills } from "./core/skills/skillLoader";
+import { McpManager } from "./core/mcp/mcpManager";
+import { CheckpointManager } from "./core/checkpoint/checkpointManager";
+import type { AppState, McpToolDescriptor, ModelInfo } from "./shared/types";
 import type { HostToWebview, WebviewToHost } from "./shared/protocol";
 import { logger } from "./core/util/logger";
 import { registerCommands } from "./commands";
@@ -42,6 +47,36 @@ export function activate(context: vscode.ExtensionContext): void {
   const toolRegistry = new ToolRegistry();
   registerBuiltinTools(toolRegistry);
 
+  const skillRegistry = new SkillRegistry();
+  skillRegistry.registerMany(BUILT_IN_SKILLS);
+  const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (wsRoot) {
+    const project = loadProjectSkills(wsRoot);
+    skillRegistry.registerMany(project.skills);
+    if (project.errors.length > 0) {
+      for (const err of project.errors) logger.warn(`skill load failed: ${err.file}: ${err.error}`);
+    }
+  }
+
+  const mcpTools: McpToolDescriptor[] = [];
+  const mcpManager = new McpManager();
+  mcpManager.setListeners({
+    tools: (descriptors) => {
+      mcpTools.length = 0;
+      mcpTools.push(...descriptors);
+      post({ type: "state/patch", patch: { mcpTools: [...mcpTools] } });
+    },
+    status: (id, status, info) => {
+      logger.info(`mcp ${id} → ${status}${info ? `: ${info}` : ""}`);
+    },
+  });
+
+  const checkpointManager = new CheckpointManager(
+    context.globalStorageUri.fsPath,
+    settingsStore.read().checkpoints?.maxCount ?? 50,
+  );
+  void checkpointManager.init();
+
   const provider = new NexusWebviewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(NexusWebviewProvider.viewType, provider, {
@@ -55,9 +90,9 @@ export function activate(context: vscode.ExtensionContext): void {
     providers: providerRegistry.list(),
     models: { ...modelCache },
     modes: builtInModes,
-    skills: [],
+    skills: skillRegistry.list(),
     mcpServers: [],
-    mcpTools: [],
+    mcpTools: [...mcpTools],
     currentMode: "code",
     recentTasks: sessionStore.recentTasks(),
     queue: [],
@@ -96,12 +131,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerCommands(context, provider);
 
-  // Tool registry / security bridge are not yet exercised in stage 3 — they
-  // get wired into the agent loop in stage 5. For now we expose them through
-  // the extension exports for unit-testability and so future stages don't have
-  // to re-plumb activation.
+  // The tool registry, skill registry, MCP manager and checkpoint manager get
+  // exercised by the agent loop in stage 5. They are constructed here so the
+  // wiring is in place and the webview can render `skills`, `mcpTools`,
+  // `checkpoints` from real data.
   void toolRegistry;
   void buildSecurityBridge;
+  void skillRegistry;
+  void mcpManager;
+  void checkpointManager;
+
+  context.subscriptions.push({ dispose: () => void mcpManager.stopAll() });
 
   logger.info("NexusCode Agent activated");
 }
