@@ -85,10 +85,25 @@ The final PR target is `dev → main`.
   - `McpView` enhanced: dedicated "Discovered tools" section listing tools with server attribution, command preview, configured-via-`.nexus/mcp.json` tip
   - `taskManager.recordToolCall()` now merges so `tool_call_end` events do not blow away `tool_call_start` metadata (name, riskLevel, approvalState, args, startedAt)
 
-- [ ] **Stage 7 — Tests & docs**
-  - vitest tests for: queue manager, edit engine, approval policy, secret scanner, skills loader, context builder, provider adapters
-  - `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CONTRIBUTING.md`, `CHANGELOG.md`
-  - `vsce package` produces a working `.vsix`
+- [x] **Stage 7 — Tests & docs**
+  - vitest tests cover every Stage 7 bucket — 15 files / 105 passing tests:
+    - queue manager (`tests/queue.test.ts`, 8)
+    - edit engine (`tests/patchEngine.test.ts`, 7)
+    - approval policy + heuristics (`tests/approval.test.ts` 11 + `tests/approvalGate.test.ts` 4)
+    - secret scanner / ignore matcher / path guard (`tests/security.test.ts`, 12)
+    - skills (built-in + project loader) (`tests/skills.test.ts`, 8)
+    - context refs + token budget (`tests/context.test.ts`, 11)
+    - provider adapters + SSE parser + registry (`tests/providers.test.ts`, 15)
+    - tool registry + filesystem tools + secret-redaction (`tests/tools.test.ts`, 7)
+    - rules loader (`tests/rules.test.ts`, 6)
+    - checkpoint manager (`tests/checkpoint.test.ts`, 3)
+    - MCP stdio framing (`tests/mcp.test.ts`, 3)
+    - agent runner end-to-end with stubbed provider (`tests/agentRunner.test.ts`, 3)
+    - task manager start/end merge (`tests/taskManager.test.ts`, 5)
+  - Docs added: `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CONTRIBUTING.md`, `CHANGELOG.md`
+  - `pnpm run package` (vsce, `--no-dependencies`) produces a working `.vsix` (~176 KB, 13 files)
+  - `media/icon.png` added so vsce no longer fails on the missing marketplace icon
+  - `.vscodeignore` cleaned: `pnpm-lock.yaml`, `STATUS.md`, `CHANGELOG.md`, `.nexus*`, lockfiles, and `.github/` are excluded from the package
 
 - [ ] **Final** — open `dev → main` PR with full summary, screenshots, and how-to-test
 
