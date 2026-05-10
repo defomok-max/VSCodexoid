@@ -1,12 +1,26 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAppStore } from "../../stores/appStore";
 import { QueuePanel } from "../Queue/QueuePanel";
+import { Markdown } from "./Markdown";
+import { ToolCallCard } from "./ToolCallCard";
+import { PlanCard, TodoCard } from "./PlanCard";
 
 export function ChatView() {
   const state = useAppStore((s) => s.state);
   const send = useAppStore((s) => s.send);
   const [text, setText] = useState("");
   const messages = state.currentTask?.messages ?? [];
+  const toolCalls = state.currentTask?.toolCalls ?? [];
+  const plan = state.currentTask?.plan ?? [];
+  const todo = state.currentTask?.todo ?? [];
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages.length, state.currentTask?.id]);
 
   const onSend = (sendNow = false) => {
     if (!text.trim()) return;
@@ -30,19 +44,47 @@ export function ChatView() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollerRef} className="flex-1 overflow-auto">
         {messages.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-            {messages.map((m) => (
-              <div key={m.id} className={`animate-slideUp ${m.role === "user" ? "" : ""}`}>
-                <div className="text-[11px] uppercase tracking-wide text-nexus-muted mb-1">
-                  {m.role}
-                </div>
-                <div className="nx-card p-3 markdown whitespace-pre-wrap">{m.content}</div>
+            {plan.length > 0 && <PlanCard steps={plan} />}
+            {todo.length > 0 && <TodoCard items={todo} />}
+            <AnimatePresence initial={false}>
+              {messages.map((m) => (
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <div className="text-[11px] uppercase tracking-wide text-nexus-muted mb-1 flex items-center gap-2">
+                    <span>{m.role}</span>
+                    {m.reasoningSummary && <span className="text-amber-400/80">↳ thinking</span>}
+                  </div>
+                  <div className="nx-card p-3">
+                    {m.role === "tool" ? (
+                      <pre className="text-xs whitespace-pre-wrap break-words">{m.content}</pre>
+                    ) : (
+                      <Markdown content={m.content || ""} />
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            {toolCalls.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[11px] uppercase tracking-wide text-nexus-muted">Tool calls</div>
+                <AnimatePresence initial={false}>
+                  {toolCalls.map((tc) => (
+                    <ToolCallCard key={tc.id} call={tc} />
+                  ))}
+                </AnimatePresence>
               </div>
-            ))}
+            )}
+            {state.agentBusy && <Thinking />}
           </div>
         )}
       </div>
@@ -70,14 +112,35 @@ export function ChatView() {
               {state.agentBusy ? "Queue" : "Send"}
             </button>
             {state.agentBusy && (
-              <button className="nx-btn nx-btn-soft" onClick={() => onSend(true)}>
-                Send Now
-              </button>
+              <>
+                <button className="nx-btn nx-btn-soft" onClick={() => onSend(true)}>
+                  Send Now
+                </button>
+                <button
+                  className="nx-btn nx-btn-soft text-red-400"
+                  onClick={() => send({ type: "task/stop" })}
+                >
+                  Stop
+                </button>
+              </>
             )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function Thinking() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="text-xs text-nexus-muted flex items-center gap-2"
+    >
+      <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+      <span>Agent is working…</span>
+    </motion.div>
   );
 }
 
@@ -92,7 +155,11 @@ function EmptyState() {
   ];
   return (
     <div className="h-full flex items-center justify-center px-4">
-      <div className="max-w-md text-center space-y-4 animate-fadeIn">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md text-center space-y-4"
+      >
         <div className="text-4xl">◆</div>
         <h2 className="text-lg font-semibold">Ask Nexus to understand, change, test, or review your code.</h2>
         <p className="text-sm text-nexus-muted">
@@ -111,7 +178,7 @@ function EmptyState() {
             </button>
           ))}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

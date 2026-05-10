@@ -93,8 +93,17 @@ export class TaskManager {
     const t = this.tasks.get(id);
     if (!t) return undefined;
     const i = t.toolCalls.findIndex((c) => c.id === call.id);
-    if (i >= 0) t.toolCalls[i] = call;
-    else t.toolCalls.push(call);
+    if (i >= 0) {
+      // Merge so that the second event (typically tool_call_end) does not
+      // overwrite the start-side metadata (name, riskLevel, args, startedAt).
+      const merged: ToolCallRecord = {
+        ...t.toolCalls[i],
+        ...(stripUndef(call as unknown as Record<string, unknown>) as Partial<ToolCallRecord>),
+      };
+      t.toolCalls[i] = merged;
+    } else {
+      t.toolCalls.push(call);
+    }
     this.emit(t);
     return t;
   }
@@ -118,6 +127,15 @@ export class TaskManager {
 
 function makeTaskId(): string {
   return `task_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function stripUndef<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const k of Object.keys(obj) as Array<keyof T>) {
+    const v = obj[k];
+    if (v !== undefined && !(typeof v === "string" && v.length === 0)) out[k] = v;
+  }
+  return out;
 }
 
 function deriveTitle(prompt: string): string {

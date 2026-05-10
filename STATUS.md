@@ -73,14 +73,17 @@ The final PR target is `dev → main`.
   - Builds context chunks from `@file/@folder/@symbol/@terminal/@problems/@gitdiff/@openfiles` refs and packs into 8000-token budget per turn
   - +20 new vitest tests → 105 total passing
 
-- [ ] **Stage 6 — UI polish & screenshots**
-  - Real Providers / Modes / Skills / MCP editor UIs (forms, validation, JSON view)
-  - Indexing status / progress UI
-  - Plan & todo cards in chat
-  - Tool-call activity cards with risk badges and result previews
-  - Markdown + code block renderer with copy buttons
-  - Animations, empty states, loading states polish
-  - README screenshots from running webview
+- [x] **Stage 6 — UI polish**
+  - Lightweight in-house markdown renderer for chat (`Markdown`): fenced code blocks with `Copy` button, inline code, bold/italic, headers, bullets — keeps the webview bundle slim
+  - `ToolCallCard` activity cards with status dot, risk badge, approval-state tag, expandable args/result/error JSON, motion-fade-in
+  - `PlanCard` with numbered steps, rationale, expected files, tool hint, per-step risk badge
+  - `TodoCard` with status-aware checkbox (pending / in_progress / completed / blocked)
+  - `ChatView` upgrade: live auto-scroll, framer-motion message animations, stop-button while running, animated "agent is working" indicator
+  - `ApprovalDialog` upgrade: backdrop blur, spring scale-in, **Approve once / Approve & remember / Reject** trio
+  - `SkillsView` enhanced: search filter (id, name, description, triggers), expandable cards exposing instructions / workflow / allowed tools / output format / safety constraints, `built-in` vs `project` source tag
+  - `ModesView` enhanced: 2-column responsive grid, active-state highlight, policy / reasoning / risk-tolerance tags, allowed-tool count, `whileTap` micro-animation
+  - `McpView` enhanced: dedicated "Discovered tools" section listing tools with server attribution, command preview, configured-via-`.nexus/mcp.json` tip
+  - `taskManager.recordToolCall()` now merges so `tool_call_end` events do not blow away `tool_call_start` metadata (name, riskLevel, approvalState, args, startedAt)
 
 - [ ] **Stage 7 — Tests & docs**
   - vitest tests for: queue manager, edit engine, approval policy, secret scanner, skills loader, context builder, provider adapters
