@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { reconcileMcpLifecycle, restartMcpServer } from "../src/core/mcp/mcpLifecycle";
-import { mergeServers, isMcpServerConfig } from "../src/core/storage/mcpConfigStore";
+import { mergeServers, isMcpServerConfig, normalizeMcpServerList } from "../src/core/storage/mcpConfigStore";
 import type { McpServerConfig } from "../src/shared/types";
 import type { McpClient } from "../src/core/mcp/mcpManager";
 import { McpManager } from "../src/core/mcp/mcpManager";
@@ -143,5 +143,28 @@ describe("mcpConfigStore / mergeServers + isMcpServerConfig", () => {
     expect(isMcpServerConfig(null)).toBe(false);
     expect(isMcpServerConfig(undefined)).toBe(false);
     expect(isMcpServerConfig("a")).toBe(false);
+  });
+
+  it("normalizes project .nexus/mcp.json object format from the spec", () => {
+    const list = normalizeMcpServerList({
+      servers: {
+        github: {
+          type: "stdio",
+          command: "npx",
+          args: ["-y", "@modelcontextprotocol/server-github"],
+          enabled: true,
+        },
+      },
+    });
+    expect(list).toEqual([
+      {
+        id: "github",
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-github"],
+        enabled: true,
+      },
+    ]);
+    expect(list.filter(isMcpServerConfig)).toHaveLength(1);
   });
 });

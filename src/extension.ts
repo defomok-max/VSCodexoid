@@ -504,7 +504,60 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
     case "queue/sendNow": {
       const popped = deps.runnerDeps.queueManager.sendNow(msg.itemId, msg.behavior);
       if (popped) {
-        await startTask(popped.item.text, popped.item.modeOverride, popped.item.providerOverride, popped.item.modelOverride, deps, popped.item.attachments);
+        if (popped.behavior === "high-priority-next") {
+          post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+        } else if (popped.behavior === "interrupt-current") {
+          const active = deps.runnerDeps.getActiveRun();
+          if (active) {
+            deps.runnerDeps.queueManager.add({
+              text: popped.item.text,
+              priority: Math.max((popped.item.priority ?? 0) + 1, Date.now()),
+              attachments: popped.item.attachments,
+              contextRefs: popped.item.contextRefs,
+              modeOverride: popped.item.modeOverride,
+              providerOverride: popped.item.providerOverride,
+              modelOverride: popped.item.modelOverride,
+            });
+            active.abort();
+            deps.runnerDeps.approvalGate.cancelAll("interrupted");
+            post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+          } else {
+            await startTask(
+              popped.item.text,
+              popped.item.modeOverride,
+              popped.item.providerOverride,
+              popped.item.modelOverride,
+              deps,
+              popped.item.attachments,
+            );
+          }
+        } else {
+          const text =
+            popped.behavior === "incorporate-into-plan"
+              ? `Incorporate this follow-up into the current plan:\n\n${popped.item.text}`
+              : popped.item.text;
+          if (deps.runnerDeps.getActiveRun()) {
+            deps.runnerDeps.queueManager.add({
+              text,
+              priority: popped.item.priority ?? 0,
+              attachments: popped.item.attachments,
+              contextRefs: popped.item.contextRefs,
+              modeOverride: popped.item.modeOverride,
+              providerOverride: popped.item.providerOverride,
+              modelOverride: popped.item.modelOverride,
+            });
+            post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+          } else {
+            await startTask(
+              text,
+              popped.item.modeOverride,
+              popped.item.providerOverride,
+              popped.item.modelOverride,
+              deps,
+              popped.item.attachments,
+            );
+          }
+        }
       }
       return;
     }
@@ -882,7 +935,24 @@ async function startTask(
   } finally {
     runnerDeps.setActiveRun(undefined);
     post({ type: "state/patch", patch: { agentBusy: false } });
+    void runQueuedNext(deps);
   }
+}
+
+async function runQueuedNext(deps: MessageDeps): Promise<void> {
+  const { runnerDeps } = deps;
+  const settings = runnerDeps.settingsStore.read();
+  if (runnerDeps.getActiveRun() || !settings.queue.enabled || !settings.queue.autoSendNext) return;
+  const next = runnerDeps.queueManager.popNext();
+  if (!next) return;
+  await startTask(
+    next.text,
+    next.modeOverride,
+    next.providerOverride,
+    next.modelOverride,
+    deps,
+    next.attachments,
+  );
 }
 
 export function deactivate(): void {

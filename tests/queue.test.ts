@@ -52,6 +52,16 @@ describe("QueueManager", () => {
     expect(q.list()).toHaveLength(1);
   });
 
+  it("sendNow high-priority-next keeps the item and promotes it", () => {
+    const q = new QueueManager();
+    q.add(baseItem("a", 1));
+    const b = q.add(baseItem("b", 0));
+    const popped = q.sendNow(b.id, "high-priority-next");
+    expect(popped?.item.text).toBe("b");
+    expect(q.list()).toHaveLength(2);
+    expect(q.list().find((i) => i.status === "next")?.id).toBe(b.id);
+  });
+
   it("popNext returns nothing when paused", () => {
     const q = new QueueManager();
     q.add(baseItem("a"));

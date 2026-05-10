@@ -48,7 +48,7 @@ export class McpConfigStore {
       const uri = vscode.Uri.joinPath(vscode.Uri.file(this.workspaceRoot), PROJECT_FILE_REL);
       const bytes = await vscode.workspace.fs.readFile(uri);
       const parsed = JSON.parse(new TextDecoder().decode(bytes));
-      const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.servers) ? parsed.servers : [];
+      const list = normalizeMcpServerList(parsed);
       return list.filter(isMcpServerConfig);
     } catch {
       // Missing file (most common) and parse errors both fall back to no
@@ -57,6 +57,18 @@ export class McpConfigStore {
       return [];
     }
   }
+}
+
+export function normalizeMcpServerList(parsed: unknown): unknown[] {
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object") return [];
+  const servers = (parsed as { servers?: unknown }).servers;
+  if (Array.isArray(servers)) return servers;
+  if (!servers || typeof servers !== "object") return [];
+  return Object.entries(servers).map(([id, cfg]) => ({
+    id,
+    ...(cfg && typeof cfg === "object" ? cfg : {}),
+  }));
 }
 
 /**

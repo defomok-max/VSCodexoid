@@ -100,6 +100,14 @@ export class QueueManager {
   sendNow(id: string, behavior: QueueSendBehavior): { item: QueueItem; behavior: QueueSendBehavior } | undefined {
     const i = this.items.findIndex((x) => x.id === id);
     if (i < 0) return undefined;
+    if (behavior === "high-priority-next") {
+      const item = this.items[i];
+      item.priority = Math.max(item.priority ?? 0, this.highestPriority() + 1);
+      item.sendBehavior = behavior;
+      this.refreshNext();
+      this.fire();
+      return { item: { ...item }, behavior };
+    }
     const [item] = this.items.splice(i, 1);
     item.status = "sent";
     item.sendBehavior = behavior;
@@ -159,6 +167,10 @@ export class QueueManager {
       if (isSentLike) continue;
       this.items[i].status = i === chosen ? "next" : "queued";
     }
+  }
+
+  private highestPriority(): number {
+    return this.items.reduce((max, item) => Math.max(max, item.priority ?? 0), -Infinity);
   }
 }
 
