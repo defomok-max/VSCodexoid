@@ -5,7 +5,34 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 9: HTTP/SSE MCP transport
+## [Unreleased] — Stage 10: AWS Bedrock SigV4 adapter
+
+### Added
+- `BedrockProvider` (`src/core/providers/bedrock.ts`) — native AWS Bedrock
+  adapter using SigV4 signing and the unified Converse / ConverseStream
+  APIs. Works with Anthropic Claude, Meta Llama, Cohere Command, Mistral,
+  and Amazon Nova model families.
+- `signSigV4` (`src/core/providers/util/sigv4.ts`) — pure-TS AWS Signature
+  Version 4 implementation (no `@aws-sdk/*` dependency). Uses Node's
+  built-in `crypto` for HMAC-SHA256.
+- Inline Bedrock event-stream parser for `application/vnd.amazon.eventstream`
+  binary framing (used by `ConverseStream`). Supports `messageStart`,
+  `contentBlockStart`, `contentBlockDelta`, `messageStop`, `metadata`.
+- `aws-bedrock` default profile in `DEFAULT_PROFILES` pointing at
+  `bedrock-runtime.us-east-1.amazonaws.com` with Claude 3.5 Sonnet as default.
+- 12 new vitest tests: 7 for SigV4 (determinism, credential scope, payload
+  hashing, header sorting, signature flips on payload/region/session-token
+  changes), 5 for the Bedrock provider (registry dispatch, signed Converse
+  request shape, error surfacing, credential validation, tool-call /
+  tool-result message translation). **Total: 122 tests** passing.
+
+### Changed
+- `providerRegistry.ts`: `aws-bedrock` profiles now build `BedrockProvider`
+  instead of being routed through `OpenAICompatibleProvider`.
+- `docs/ARCHITECTURE.md` providers section updated to reflect the new
+  dedicated adapter.
+
+## [0.1.0+stage9] — Stage 9: HTTP/SSE MCP transport
 
 ### Added
 - `McpHttpClient` (`src/core/mcp/mcpHttpClient.ts`) — implements the MCP

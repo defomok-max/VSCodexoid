@@ -200,9 +200,17 @@ Five concrete adapters:
 
 The OpenAI-compatible adapter covers OpenAI, Groq, DeepSeek, xAI, Together,
 Fireworks, Perplexity, Mistral, OpenRouter, LM Studio, LocalAI, Azure OpenAI,
-Cohere, HuggingFace, and AWS Bedrock (the last three are routed through this
-adapter for the MVP — dedicated wrappers can be added without touching call
-sites).
+Cohere, and HuggingFace.
+
+**AWS Bedrock** has its own dedicated adapter (`bedrock.ts`) using
+`aws-sigv4` request signing (`util/sigv4.ts`, pure-TS, no SDK) against the
+unified [Converse / ConverseStream](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
+APIs. Streaming uses Bedrock's binary `application/vnd.amazon.eventstream`
+framing, parsed inline. Credentials are accepted as a JSON-encoded
+`apiKey` (`{accessKeyId, secretAccessKey, sessionToken, region}`),
+`profile.customParameters`, or `AWS_*` environment variables. The same
+adapter works for Anthropic Claude, Meta Llama, Cohere Command, Mistral,
+and Amazon Nova model families through Bedrock.
 
 `providerRegistry.ts` holds the live `Map<id, LLMProvider>` and rebuilds an
 adapter on profile mutations. It also exports `DEFAULT_PROFILES[]` — 13

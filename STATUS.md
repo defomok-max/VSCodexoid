@@ -116,7 +116,14 @@ The final PR target is `dev → main`.
   - +5 vitest tests → **110 total**; previous `transport "<x>" not yet implemented` error gone
   - `docs/ARCHITECTURE.md` §11 rewritten to describe all three transports
 
-- [x] **Final** — `dev → main` PR merged at `522ad3f` (Stages 1–8). Stage 9+ ship via individual PRs against `main`.
+- [x] **Stage 10 — AWS Bedrock SigV4 adapter**
+  - `BedrockProvider` (Converse / ConverseStream APIs) replaces the OpenAI-compatible fallback for `aws-bedrock` profiles
+  - `util/sigv4.ts` — pure-TS Signature Version 4 (no `@aws-sdk/*` dependency); uses Node's built-in `crypto`
+  - Inline parser for binary `application/vnd.amazon.eventstream` (ConverseStream)
+  - Credentials: JSON `apiKey` / `customParameters` / `AWS_*` env vars
+  - +12 vitest tests → **122 total**
+
+- [x] **Final** — `dev → main` PR merged at `522ad3f` (Stages 1–8); Stage 9+ ship via individual PRs against `main`.
 
 ---
 
