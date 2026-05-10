@@ -121,7 +121,7 @@ export function aggregateUsage(
   const taskCosts = tasks.map((t) => costForTask(t, providers));
   const totals = totalsFromTaskCosts(taskCosts);
   const providerName = (id: string) => providers.find((p) => p.id === id)?.name ?? id;
-  const byProvider = bucketBy(taskCosts, (t) => t.providerId, (t, k) => providerName(k));
+  const byProvider = bucketBy(taskCosts, (t) => t.providerId, (_t, k) => providerName(k));
   const byModel = bucketBy(taskCosts, (t) => t.modelId);
   return { taskCosts, totals, byProvider, byModel };
 }
