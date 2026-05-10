@@ -17,7 +17,14 @@ import { BUILT_IN_SKILLS } from "./core/skills/builtInSkills";
 import { loadProjectSkills } from "./core/skills/skillLoader";
 import { McpManager } from "./core/mcp/mcpManager";
 import { CheckpointManager } from "./core/checkpoint/checkpointManager";
-import type { AppState, McpToolDescriptor, ModelInfo } from "./shared/types";
+import { QueueManager } from "./core/agent/queueManager";
+import { TaskManager } from "./core/agent/taskManager";
+import { ApprovalGate } from "./core/agent/approvalGate";
+import { runAgent } from "./core/agent/agentRunner";
+import { parseContextRefs, stripContextRefs } from "./core/context/contextRef";
+import { buildContextChunks, packContext } from "./core/context/contextBuilder";
+import { loadNexusRules } from "./core/rules/rulesLoader";
+import type { AppState, ChatMessage, McpToolDescriptor, ModelInfo, ProviderProfile, RiskLevel } from "./shared/types";
 import type { HostToWebview, WebviewToHost } from "./shared/protocol";
 import { logger } from "./core/util/logger";
 import { registerCommands } from "./commands";
@@ -37,7 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
   logger.info("activating NexusCode Agent");
 
   const settingsStore = new SettingsStore();
-  const sessionStore = new SessionStore(context.globalState);
+  void SessionStore;
   const providerProfileStore = new ProviderProfileStore(context.globalState);
   const providerSecretStore = new ProviderSecretStore(context.secrets);
   const providerRegistry = new ProviderRegistry();
@@ -77,12 +84,26 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   void checkpointManager.init();
 
+  const queueManager = new QueueManager();
+  const taskManager = new TaskManager();
+  const approvalGate = new ApprovalGate();
+  let activeRunController: AbortController | undefined;
+
+  taskManager.onUpdate((task) => {
+    post({ type: "task/update", task });
+  });
+  approvalGate.onRequest((req) => {
+    post({ type: "approval/request", req });
+  });
+
   const provider = new NexusWebviewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(NexusWebviewProvider.viewType, provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
   );
+
+  let currentModeId = "code";
 
   const buildState = (): AppState => ({
     ready: true,
@@ -93,11 +114,12 @@ export function activate(context: vscode.ExtensionContext): void {
     skills: skillRegistry.list(),
     mcpServers: [],
     mcpTools: [...mcpTools],
-    currentMode: "code",
-    recentTasks: sessionStore.recentTasks(),
-    queue: [],
-    queuePaused: false,
-    agentBusy: false,
+    currentMode: currentModeId,
+    currentTask: taskManager.current(),
+    recentTasks: taskManager.list(),
+    queue: queueManager.list(),
+    queuePaused: queueManager.isPaused(),
+    agentBusy: !!activeRunController,
   });
 
   const post = (msg: HostToWebview) => provider.postMessage(msg);
@@ -113,6 +135,7 @@ export function activate(context: vscode.ExtensionContext): void {
           providerRegistry,
           modelCache,
           buildState,
+          runnerDeps,
         });
       } catch (e) {
         logger.error("message handler failed", e);
@@ -131,15 +154,31 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerCommands(context, provider);
 
-  // The tool registry, skill registry, MCP manager and checkpoint manager get
-  // exercised by the agent loop in stage 5. They are constructed here so the
-  // wiring is in place and the webview can render `skills`, `mcpTools`,
-  // `checkpoints` from real data.
-  void toolRegistry;
+  // Snapshot deps for the message handler. The agent runner needs access to
+  // most of the wiring, so we close over them in a single object.
+  const runnerDeps = {
+    toolRegistry,
+    skillRegistry,
+    settingsStore,
+    providerRegistry,
+    providerSecretStore,
+    queueManager,
+    taskManager,
+    approvalGate,
+    checkpointManager,
+    mcpManager,
+    workspaceRoot: wsRoot,
+    getActiveRun: () => activeRunController,
+    setActiveRun: (c: AbortController | undefined) => {
+      activeRunController = c;
+    },
+    setCurrentMode: (id: string) => {
+      currentModeId = id;
+    },
+    getCurrentMode: () => currentModeId,
+  };
+  void runnerDeps;
   void buildSecurityBridge;
-  void skillRegistry;
-  void mcpManager;
-  void checkpointManager;
 
   context.subscriptions.push({ dispose: () => void mcpManager.stopAll() });
 
@@ -160,6 +199,24 @@ function buildSecurityBridge(workspaceRoot: string | undefined) {
   };
 }
 
+interface RunnerDeps {
+  toolRegistry: ToolRegistry;
+  skillRegistry: SkillRegistry;
+  settingsStore: SettingsStore;
+  providerRegistry: ProviderRegistry;
+  providerSecretStore: ProviderSecretStore;
+  queueManager: QueueManager;
+  taskManager: TaskManager;
+  approvalGate: ApprovalGate;
+  checkpointManager: CheckpointManager;
+  mcpManager: McpManager;
+  workspaceRoot: string | undefined;
+  getActiveRun: () => AbortController | undefined;
+  setActiveRun: (c: AbortController | undefined) => void;
+  setCurrentMode: (id: string) => void;
+  getCurrentMode: () => string;
+}
+
 interface MessageDeps {
   post: (m: HostToWebview) => void;
   settingsStore: SettingsStore;
@@ -168,6 +225,7 @@ interface MessageDeps {
   providerRegistry: ProviderRegistry;
   modelCache: Record<string, ModelInfo[]>;
   buildState: () => AppState;
+  runnerDeps: RunnerDeps;
 }
 
 async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<void> {
@@ -180,9 +238,6 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
     case "settings/save":
       await settingsStore.write(msg.partial);
       post({ type: "state/patch", patch: { settings: settingsStore.read() } });
-      return;
-    case "modes/setActive":
-      post({ type: "state/patch", patch: { currentMode: msg.modeId } });
       return;
     case "providers/save":
       await providerProfileStore.write(msg.profiles);
@@ -219,17 +274,207 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
         });
       }
       return;
-    case "task/start":
-      // Agent loop arrives in stage 5.
-      post({
-        type: "toast",
-        level: "info",
-        message: "Agent loop wires up in stage 5. For now this just records the prompt.",
-      });
+    case "modes/setActive":
+      deps.runnerDeps.setCurrentMode(msg.modeId);
+      post({ type: "state/patch", patch: { currentMode: msg.modeId } });
       return;
+    case "task/start":
+      await startTask(msg.prompt, msg.modeId, msg.providerId, msg.modelId, deps);
+      return;
+    case "task/stop": {
+      const c = deps.runnerDeps.getActiveRun();
+      if (c) c.abort();
+      deps.runnerDeps.approvalGate.cancelAll("stopped");
+      return;
+    }
+    case "approval/decide":
+      deps.runnerDeps.approvalGate.decide(msg.decision);
+      return;
+    case "queue/add": {
+      deps.runnerDeps.queueManager.add(msg.item);
+      post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+      return;
+    }
+    case "queue/remove": {
+      deps.runnerDeps.queueManager.remove(msg.itemId);
+      post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+      return;
+    }
+    case "queue/edit": {
+      deps.runnerDeps.queueManager.edit(msg.itemId, msg.text);
+      post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+      return;
+    }
+    case "queue/move": {
+      deps.runnerDeps.queueManager.move(msg.itemId, msg.direction);
+      post({ type: "state/patch", patch: { queue: deps.runnerDeps.queueManager.list() } });
+      return;
+    }
+    case "queue/clear": {
+      deps.runnerDeps.queueManager.clear();
+      post({ type: "state/patch", patch: { queue: [] } });
+      return;
+    }
+    case "queue/pause": {
+      deps.runnerDeps.queueManager.setPaused(true);
+      post({ type: "state/patch", patch: { queuePaused: true } });
+      return;
+    }
+    case "queue/resume": {
+      deps.runnerDeps.queueManager.setPaused(false);
+      post({ type: "state/patch", patch: { queuePaused: false } });
+      return;
+    }
+    case "queue/sendNow": {
+      const popped = deps.runnerDeps.queueManager.sendNow(msg.itemId, msg.behavior);
+      if (popped) {
+        await startTask(popped.item.text, popped.item.modeOverride, popped.item.providerOverride, popped.item.modelOverride, deps);
+      }
+      return;
+    }
     default:
       // Other messages are accepted silently; later stages add real handlers.
       return;
+  }
+}
+
+async function startTask(
+  prompt: string,
+  modeId: string | undefined,
+  providerId: string | undefined,
+  modelId: string | undefined,
+  deps: MessageDeps,
+): Promise<void> {
+  const { post, runnerDeps } = deps;
+  if (runnerDeps.getActiveRun()) {
+    post({ type: "toast", level: "warn", message: "agent is already running" });
+    return;
+  }
+  const settings = runnerDeps.settingsStore.read();
+  const mode = builtInModes.find((m) => m.id === (modeId ?? runnerDeps.getCurrentMode())) ?? builtInModes[0];
+  const profile: ProviderProfile | undefined =
+    runnerDeps.providerRegistry.list().find((p) => p.id === (providerId ?? settings.defaultProviderId));
+  if (!profile) {
+    post({ type: "toast", level: "error", message: "no provider profile configured" });
+    return;
+  }
+  const provider = runnerDeps.providerRegistry.get(profile.id);
+  if (!provider) {
+    post({ type: "toast", level: "error", message: `provider ${profile.id} not available` });
+    return;
+  }
+  const apiKey = await runnerDeps.providerSecretStore.get(profile.apiKeySecretRef ?? profile.id);
+  const effectiveModelId = modelId ?? settings.defaultModelId ?? profile.defaultModel ?? "";
+
+  const refs = parseContextRefs(prompt);
+  const userTurnText = stripContextRefs(prompt);
+  const security = buildSecurityBridge(runnerDeps.workspaceRoot);
+  const chunks = await buildContextChunks(refs, {
+    workspaceRoot: runnerDeps.workspaceRoot,
+    security,
+  });
+  const packed = packContext(chunks, 8000);
+  const matchedSkills = runnerDeps.skillRegistry.match(prompt);
+  const rulesText = loadNexusRules(runnerDeps.workspaceRoot);
+
+  const task = runnerDeps.taskManager.create({
+    prompt,
+    modeId: mode.id,
+    providerId: profile.id,
+    modelId: effectiveModelId,
+    activeSkills: matchedSkills.map((s) => s.id),
+  });
+  const userMessage: ChatMessage = { id: `u_${Date.now()}`, role: "user", content: prompt, ts: Date.now() };
+  runnerDeps.taskManager.appendMessage(task.id, userMessage);
+  post({ type: "task/message", message: userMessage });
+
+  const ctrl = new AbortController();
+  runnerDeps.setActiveRun(ctrl);
+  post({ type: "state/patch", patch: { agentBusy: true } });
+
+  try {
+    const stream = runAgent(
+      {
+        taskId: task.id,
+        prompt: userTurnText,
+        contextChunksText: packed.text || undefined,
+        mode,
+        matchedSkills,
+        rulesText,
+        settings,
+        provider,
+        apiKey,
+        modelId: effectiveModelId,
+        policy: settings.approvalPolicy,
+      },
+      {
+        toolRegistry: runnerDeps.toolRegistry,
+        ui: {
+          showInfo: (m) => post({ type: "toast", level: "info", message: m }),
+          showWarning: (m) => post({ type: "toast", level: "warn", message: m }),
+          showError: (m) => post({ type: "toast", level: "error", message: m }),
+          getSelection: async () => undefined,
+          getOpenFiles: async () =>
+            vscode.workspace.textDocuments.map((d) => d.uri.fsPath),
+          askUser: async (q: string) => await vscode.window.showInputBox({ prompt: q }),
+        },
+        security,
+        workspaceRoot: runnerDeps.workspaceRoot,
+        requestApproval: (req) => runnerDeps.approvalGate.request(req),
+      },
+      ctrl.signal,
+    );
+    for await (const ev of stream) {
+      if (ev.type === "text_delta") {
+        post({ type: "task/streamDelta", taskId: task.id, messageId: "current", delta: ev.text });
+      } else if (ev.type === "message_complete") {
+        const assistant: ChatMessage = {
+          id: ev.messageId,
+          role: "assistant",
+          content: ev.text,
+          ts: Date.now(),
+          reasoningSummary: ev.reasoning,
+        };
+        runnerDeps.taskManager.appendMessage(task.id, assistant);
+        post({ type: "task/message", message: assistant });
+      } else if (ev.type === "tool_call_start") {
+        runnerDeps.taskManager.recordToolCall(task.id, {
+          id: ev.toolCallId,
+          name: ev.name,
+          args: undefined,
+          startedAt: Date.now(),
+          riskLevel: ev.risk as RiskLevel,
+          approvalState: "pending",
+        });
+        post({ type: "task/toolStart", taskId: task.id, toolCallId: ev.toolCallId, name: ev.name, argsPreview: ev.argsPreview });
+      } else if (ev.type === "tool_pending_approval") {
+        post({ type: "approval/request", req: ev.req });
+      } else if (ev.type === "tool_call_end") {
+        runnerDeps.taskManager.recordToolCall(task.id, {
+          id: ev.toolCallId,
+          name: "",
+          args: undefined,
+          startedAt: Date.now() - 1,
+          endedAt: Date.now(),
+          ok: ev.ok,
+          resultPreview: ev.resultPreview,
+          errorMessage: ev.errorMessage,
+        });
+        post({ type: "task/toolEnd", taskId: task.id, toolCallId: ev.toolCallId, ok: ev.ok, resultPreview: ev.resultPreview, errorMessage: ev.errorMessage });
+      } else if (ev.type === "diff") {
+        post({ type: "diff/show", taskId: task.id, files: ev.files });
+      } else if (ev.type === "task_end") {
+        runnerDeps.taskManager.setStatus(task.id, ev.reason === "completed" ? "completed" : ev.reason === "stopped" ? "cancelled" : "failed");
+      } else if (ev.type === "error") {
+        post({ type: "toast", level: "error", message: ev.message });
+      }
+    }
+  } catch (e) {
+    post({ type: "toast", level: "error", message: (e as Error).message });
+    runnerDeps.taskManager.setStatus(task.id, "failed");
+  } finally {
+    runnerDeps.setActiveRun(undefined);
+    post({ type: "state/patch", patch: { agentBusy: false } });
   }
 }
 

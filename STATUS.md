@@ -62,13 +62,16 @@ The final PR target is `dev → main`.
   - Skills + MCP + checkpoints wired into `extension.ts` activation; project skills auto-loaded from workspace
   - +31 new vitest tests → 85 total passing
 
-- [~] **Stage 5 — Agent loop**
-  - Planner (collect context → produce plan → request approval)
-  - Executor (tool loop with cancellation + token streaming)
-  - Queue manager (queue/dequeue, reorder, send-now, auto-send next)
-  - Task manager (status transitions, persistence, fork/resume)
-  - Real `task/start`, `task/stop`, `queue/*`, `approval/decide` handlers
-  - End-to-end run from chat input → plan → approval → tool calls → diff → summary
+- [x] **Stage 5 — Agent loop**
+  - `QueueManager` (add / remove / edit / move up-down-top / sendNow with behavior / popNext / pause / resume / clear, automatic `next`-tagging by priority)
+  - `TaskManager` (create / update / setStatus with terminal-state `endedAt` / appendMessage / recordToolCall / setPlan / setTodo, listener API)
+  - `ApprovalGate` (`request()` ↔ `decide()` pairing, `cancelAll()`, listener API)
+  - `runAgent()` async generator — system prompt builder (mode + matched skills + `.nexusrules` + custom instructions + tool catalog), provider streaming, tool-call accumulation, Zod arg validation, dynamic risk evaluation, approval-matrix gating, in-process tool execution, looping up to `MAX_ROUNDS`
+  - Filters tools by mode `allowedTools` and intersects with skill `allowedTools`
+  - Streams `task_start` / `text_delta` / `thinking` / `message_complete` / `tool_call_start` / `tool_pending_approval` / `tool_call_end` / `diff` / `usage` / `task_end` / `error`
+  - Wired into `extension.ts`: real `task/start`, `task/stop`, `approval/decide`, `queue/add`, `queue/remove`, `queue/edit`, `queue/move`, `queue/clear`, `queue/pause`, `queue/resume`, `queue/sendNow` handlers
+  - Builds context chunks from `@file/@folder/@symbol/@terminal/@problems/@gitdiff/@openfiles` refs and packs into 8000-token budget per turn
+  - +20 new vitest tests → 105 total passing
 
 - [ ] **Stage 6 — UI polish & screenshots**
   - Real Providers / Modes / Skills / MCP editor UIs (forms, validation, JSON view)
