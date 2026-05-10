@@ -33,15 +33,22 @@ The final PR target is `dev → main`.
   - Real Providers UI: add / edit / delete profile, edit base URL & default model, save API key, refresh model list, set default
   - 17 vitest tests for SSE parser, path picker, all 5 adapters, and registry
 
-- [~] **Stage 3 — Tools, approval, security**
-  - Tool registry (Zod schemas, risk levels, audit log)
-  - Built-in tools: read/write/edit/create/delete/rename file, list_files, search_files, grep, get_symbols, get_diagnostics, get_open_files, get_selection, get_terminal_output, run_terminal_command, run_test_command, get_git_status, get_git_diff, create_git_branch, stage_files, commit_changes, create_checkpoint, restore_checkpoint, rollback_checkpoint, fetch_url, ask_user, show_diff, apply_patch, format_files, install_dependency, update_todo_list, queue_message
-  - Approval manager + 4 policies (manual / balanced / auto-safe / full-auto)
-  - Secret scanner (API keys, tokens, private keys, env values)
-  - `.nexusignore` runtime enforcement
-  - Patch-based edit engine (unified diff, hunk accept/reject, rollback)
+- [x] **Stage 3 — Tools, approval, security**
+  - `ToolRegistry` (Zod schemas + JSON-Schema fragments, risk per tool, dynamic risk via `assessRisk`)
+  - 15 built-in tools wired:
+    - `read_file`, `list_files`, `write_file`, `edit_file`, `create_file`, `delete_file`, `rename_file`
+    - `search_files`, `grep` (literal or regex, file pattern, max results, binary skip)
+    - `run_terminal_command` (timeout, abort signal, output capped, output secret-redacted)
+    - `get_git_status`, `get_git_diff`, `create_git_branch`, `stage_files`, `commit_changes`
+  - `evaluateApproval(policy, risk)` matrix — `manual` / `balanced` / `auto-safe` / `full-auto`
+  - `assessCommandRisk()` heuristics for `rm -rf`, `sudo`, `curl|sh`, force-push, destructive db/docker, etc.
+  - `IgnoreMatcher` (gitignore-style, `**`/`?`/`!`/anchored/dir-only) with `SAFE_DEFAULT_IGNORES`
+  - `scanSecrets()` redactor (OpenAI/Anthropic/GitHub/Google/AWS/Slack/Stripe/JWT/private key/Discord/Telegram)
+  - `resolveWorkspacePath()` traversal guard
+  - Patch engine — `generateHunks` (LCS line diff), `buildDiffPreview`, `applyHunkMask` (per-hunk accept/reject)
+  - 37 new vitest tests → 54 total passing
 
-- [ ] **Stage 4 — Context, skills, MCP, checkpoints**
+- [~] **Stage 4 — Context, skills, MCP, checkpoints**
   - Context builder: `@file` / `@folder` / `@symbol` / `@terminal` / `@problems` / `@gitdiff` / `@openfiles` references
   - Token budget manager (relevance ranking, summarization, ignore enforcement)
   - `.nexusrules` loader
