@@ -123,6 +123,11 @@ The final PR target is `dev → main`.
   - Credentials: JSON `apiKey` / `customParameters` / `AWS_*` env vars
   - +12 vitest tests → **122 total**
 
+- [x] **Stage 11 — Dependabot + tag `v0.1.0`**
+  - `.github/dependabot.yml`: weekly npm + github-actions updates (Mondays 06:00 UTC, max 5 open PRs each), grouped sensibly (typescript-eslint, vitest, react, tailwind)
+  - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
+  - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
+
 - [x] **Final** — `dev → main` PR merged at `522ad3f` (Stages 1–8); Stage 9+ ship via individual PRs against `main`.
 
 ---

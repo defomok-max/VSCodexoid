@@ -5,7 +5,20 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 10: AWS Bedrock SigV4 adapter
+## [Unreleased] — Stage 11: Dependabot + tag v0.1.0
+
+### Added
+- `.github/dependabot.yml` — weekly Dependabot version updates for npm and
+  GitHub Actions ecosystems (Mondays 06:00 UTC, max 5 open PRs each).
+  Sensible groupings: `typescript-eslint`, `vitest`, `react`, `tailwind`
+  bundles travel together so a single PR moves a related family of
+  dependencies. Commit messages use conventional `deps` / `deps-dev` /
+  `ci` prefixes.
+- Annotated git tag `v0.1.0` on commit `522ad3f` (the original Stages 1–8
+  release). Stage 9 (HTTP/SSE MCP) and Stage 10 (Bedrock SigV4) sit on top
+  of the tag and will roll into a future `v0.2.0`.
+
+## [0.1.0+stage10] — Stage 10: AWS Bedrock SigV4 adapter
 
 ### Added
 - `BedrockProvider` (`src/core/providers/bedrock.ts`) — native AWS Bedrock
