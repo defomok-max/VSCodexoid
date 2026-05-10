@@ -3,6 +3,7 @@ import { buildToolUiBridge } from "./core/tools/uiBridgeAdapter";
 import { NexusWebviewProvider } from "./webview/webviewProvider";
 import { SettingsStore } from "./core/storage/settingsStore";
 import { SessionStore } from "./core/storage/sessionStore";
+import { QueueStore } from "./core/storage/queueStore";
 import { builtInModes } from "./core/modes/builtInModes";
 import { ProviderRegistry } from "./core/providers/providerRegistry";
 import { ProviderProfileStore } from "./core/providers/providerStore";
@@ -105,6 +106,7 @@ export function activate(context: vscode.ExtensionContext): void {
     void workspaceIndex.refresh().catch((e) => logger.warn(`workspace index initial refresh failed: ${(e as Error).message}`));
   }
 
+  const queueStore = new QueueStore(context.globalState);
   const queueManager = new QueueManager();
   const taskManager = new TaskManager();
   const approvalGate = new ApprovalGate();
@@ -113,6 +115,16 @@ export function activate(context: vscode.ExtensionContext): void {
   // Hydrate task history from persisted globalState so "recent tasks" survives
   // an extension reload.
   taskManager.seed(sessionStore.recentTasks());
+
+  // Hydrate queue state from globalState so pending follow-ups and the paused
+  // flag survive a reload, then mirror every mutation back to disk.
+  const persistedQueue = queueStore.read();
+  queueManager.hydrate(persistedQueue.items, persistedQueue.paused);
+  queueManager.onChange(() => {
+    void queueStore.save(queueManager.list(), queueManager.isPaused()).catch((e) =>
+      logger.warn(`queue persist failed: ${(e as Error).message}`),
+    );
+  });
 
   taskManager.onUpdate((task) => {
     post({ type: "task/update", task });

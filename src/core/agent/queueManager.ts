@@ -5,12 +5,13 @@ import type { QueueItem, QueueItemStatus, QueueSendBehavior } from "../../shared
  * edited, or "sent now" with a behavior modifier that affects how the agent
  * runner interprets them (see `QueueSendBehavior`).
  *
- * Persistence is intentionally external — the extension serializes the queue
- * to globalState whenever a mutation occurs.
+ * Persistence is intentionally external — the host wires `onChange` to a
+ * `QueueStore` that mirrors items + paused flag into `globalState`.
  */
 export class QueueManager {
   private items: QueueItem[] = [];
   private paused = false;
+  private listeners = new Set<() => void>();
 
   list(): QueueItem[] {
     return [...this.items];
@@ -21,12 +22,31 @@ export class QueueManager {
   }
 
   setPaused(p: boolean): void {
+    if (this.paused === p) return;
     this.paused = p;
+    this.fire();
   }
 
+  /**
+   * Subscribe to mutations. Called after every state change (add / remove /
+   * edit / move / sendNow / popNext / clear / setPaused). `hydrate` does NOT
+   * fire — it is meant to seed state from disk without ping-ponging back.
+   */
+  onChange(cb: () => void): () => void {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb);
+  }
+
+  /**
+   * Replace state from a persisted snapshot. Filters out terminal-status
+   * items (sent / cancelled / failed) so a stale memento payload never
+   * resurrects already-handled messages.
+   */
   hydrate(items: QueueItem[], paused: boolean): void {
-    this.items = [...items];
-    this.paused = paused;
+    const live = items.filter((i) => i && (i.status === "queued" || i.status === "next"));
+    this.items = live.map((i) => ({ ...i, status: "queued" as QueueItemStatus }));
+    this.paused = !!paused;
+    this.refreshNext();
   }
 
   add(input: Omit<QueueItem, "id" | "createdAt" | "status">): QueueItem {
@@ -38,6 +58,7 @@ export class QueueManager {
     };
     this.items.push(item);
     this.refreshNext();
+    this.fire();
     return item;
   }
 
@@ -46,6 +67,7 @@ export class QueueManager {
     if (i < 0) return false;
     this.items.splice(i, 1);
     this.refreshNext();
+    this.fire();
     return true;
   }
 
@@ -53,6 +75,7 @@ export class QueueManager {
     const item = this.items.find((x) => x.id === id);
     if (!item) return false;
     item.text = text;
+    this.fire();
     return true;
   }
 
@@ -70,6 +93,7 @@ export class QueueManager {
       [this.items[i], this.items[i + 1]] = [this.items[i + 1], this.items[i]];
     }
     this.refreshNext();
+    this.fire();
     return true;
   }
 
@@ -80,6 +104,7 @@ export class QueueManager {
     item.status = "sent";
     item.sendBehavior = behavior;
     this.refreshNext();
+    this.fire();
     return { item, behavior };
   }
 
@@ -94,11 +119,24 @@ export class QueueManager {
     const [item] = this.items.splice(i, 1);
     item.status = "sent";
     this.refreshNext();
+    this.fire();
     return item;
   }
 
   clear(): void {
+    if (this.items.length === 0) return;
     this.items = [];
+    this.fire();
+  }
+
+  private fire(): void {
+    for (const cb of this.listeners) {
+      try {
+        cb();
+      } catch {
+        // swallow listener errors so a buggy listener can't break the queue
+      }
+    }
   }
 
   /**

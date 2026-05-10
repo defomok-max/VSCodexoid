@@ -5,7 +5,44 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 17d: Multimodal / image input
+## [Unreleased] — Stage 18: Queue persistence
+
+### Added
+- **`QueueStore`** (`src/core/storage/queueStore.ts`) — thin
+  `vscode.Memento`-backed mirror of the message queue. Persists both the
+  `items[]` array and the `paused` flag under `nexus.queue.items` /
+  `nexus.queue.paused`. Defensive against malformed payloads (non-array items
+  collapse to `[]`).
+- **`QueueManager.onChange(cb)`** — mutation listener used by the host to
+  wire persistence. Fires after `add` / `remove` / `edit` / `move` /
+  `sendNow` / `popNext` / `clear` / `setPaused`. Skipped on `hydrate` so a
+  startup load never ping-pongs back to disk. Listener errors are swallowed.
+- **8 new vitest tests** in `tests/queueStore.test.ts` covering save/read
+  round-trip, clear, malformed-payload tolerance, listener firing per
+  mutation, no-fire on hydrate, terminal-status item filtering on hydrate,
+  and listener-error isolation. **Total: 218 tests** passing.
+
+### Changed
+- **`extension.ts` activate flow** — constructs `QueueStore` next to
+  `SessionStore`, hydrates the queue once on activation, and registers a
+  single `onChange` listener that calls `queueStore.save(...)` on every
+  mutation (fire-and-forget with a `logger.warn` fallback on disk-write
+  failure). The existing `queue/*` message handlers are unchanged — they
+  mutate the manager and the listener handles the disk side.
+- **`QueueManager.hydrate`** now filters out terminal-status items
+  (`sent` / `cancelled` / `failed`) and clamps any survivors back to
+  `queued`, so a stale memento payload from a crash mid-pop cannot
+  resurrect already-sent messages.
+- **`QueueManager.setPaused`** is now a no-op when the value is unchanged,
+  avoiding a redundant disk write on every webview reconnect.
+
+### Fixed
+- The `QueueManager` JSDoc previously claimed the host "serializes the
+  queue to globalState whenever a mutation occurs" — that wiring did not
+  exist. Pending follow-up messages and the paused flag were lost on every
+  reload. They now survive.
+
+## [0.1.0+stage17d] — Stage 17d: Multimodal / image input
 
 ### Added
 - **Image attachments in chat.** Paste an image (Cmd/Ctrl-V) or drag-and-drop
