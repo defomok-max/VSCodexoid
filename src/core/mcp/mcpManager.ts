@@ -96,6 +96,11 @@ export class McpManager {
     return this.clients.get(serverId);
   }
 
+  /** Returns the ids of servers currently held in the client map. */
+  runningServerIds(): string[] {
+    return [...this.clients.keys()];
+  }
+
   private createClient(cfg: McpServerConfig): McpClient | null {
     if (cfg.type === "stdio") {
       if (!cfg.command) {

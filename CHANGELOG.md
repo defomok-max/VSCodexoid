@@ -5,6 +5,54 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 21: MCP server lifecycle
+
+### Added
+- **`core/storage/mcpConfigStore.ts`** — persists user-scope MCP server
+  configs in `globalState["nexus.mcpServers"]`, and (optionally) merges
+  read-only entries from `<workspace>/.nexus/mcp.json`. Project-scope
+  entries override user-scope entries with the same `id` (`mergeServers`).
+  Saves only ever touch user scope; the project file is editable in-repo
+  by humans and CI.
+- **`core/mcp/mcpLifecycle.ts`** —
+  - `reconcileMcpLifecycle(manager, desired)` diffs the desired set
+    against `mcpManager.runningServerIds()` and applies the minimum
+    `startServer` / `stopServer` calls. A server is *runnable* iff
+    `enabled === true` and `autoStart !== false`. Returns
+    `{started, stopped}` for one-line host logs.
+  - `restartMcpServer(manager, cfg)` stops then conditionally starts a
+    single server (used by the `mcp/restart` UI action).
+- **`McpManager.runningServerIds()`** — primitive the lifecycle
+  reconciler needs.
+- **`extension.ts` activation hydrate** — on activate, the host loads the
+  merged server list, broadcasts it via `state.mcpServers`, and runs
+  `reconcileMcpLifecycle` so any `autoStart` server comes online.
+- **Webview message handlers** for `mcp/save`, `mcp/restart`, `mcp/test`:
+  - `mcp/save` persists user-scope servers, re-reads (so the project
+    overlay stays in sync), reconciles lifecycle, broadcasts state, and
+    surfaces a success toast with start/stop counts.
+  - `mcp/restart` finds the merged config by id and calls
+    `restartMcpServer`.
+  - `mcp/test` start-if-needed → `listTools` → toast tool count → stop
+    if it wasn't running before the probe.
+- **+9 vitest tests** in `tests/mcpLifecycle.test.ts` covering the diff
+  cases, restart behavior, and `mergeServers` / `isMcpServerConfig`.
+  **Total: 219 passing** on top of `main` (210 existing + 9 new).
+
+### Changed
+- `state.mcpServers` is now actually populated (was hard-coded `[]`). The
+  MCP panel can now render the merged server list.
+
+### Notes
+- This stage builds on Stage 20 (MCP tool execution). When both land,
+  configured servers auto-start, their tools land in `toolRegistry`, and
+  the agent can call them under the standard mode / skill /
+  workspace-trust filters.
+- `.nexus/mcp.json` accepts both a top-level array `[...]` and an object
+  with a `servers: [...]` key. Invalid entries are silently dropped via
+  `isMcpServerConfig`; missing/parse-error files fall back to the
+  user-scope list.
+
 ## [Unreleased] — Stage 17d: Multimodal / image input
 
 ### Added

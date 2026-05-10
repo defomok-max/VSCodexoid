@@ -128,6 +128,15 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 21 — MCP server lifecycle**
+  - `core/storage/mcpConfigStore.ts` — persists user-scope MCP server configs in `globalState["nexus.mcpServers"]`; optionally merges read-only entries from `<workspace>/.nexus/mcp.json` (project entries override user entries by id). Writes never touch the project file.
+  - `core/mcp/mcpLifecycle.ts` — `reconcileMcpLifecycle(manager, desired)` diffs against `manager.runningServerIds()` and applies minimum start/stop calls (server runnable iff `enabled && autoStart !== false`). `restartMcpServer(manager, cfg)` for the `mcp/restart` UI action.
+  - `McpManager.runningServerIds()` — required primitive.
+  - `extension.ts` activation hydrate: load merged server list → broadcast via `state.mcpServers` → reconcile lifecycle so `autoStart` servers come online.
+  - Webview message handlers wired: `mcp/save` (persist + reconcile + broadcast + toast counts), `mcp/restart` (find cfg → `restartMcpServer`), `mcp/test` (start-if-needed → `listTools` → toast tool count → stop if it wasn't running before the probe).
+  - +9 vitest tests in `tests/mcpLifecycle.test.ts` → **219 total** passing on top of main (210 + 9). Combined with Stage 20 once both land: 234.
+  - Together with Stage 20 (MCP tool execution), this completes the MCP loop: configured server starts on activate → its tools register in `toolRegistry` → agent can call them under mode / skill / workspace-trust filters.
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
