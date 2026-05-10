@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `ToolRegistry` as synthetic network tools, with stable ids/names, standard
   approval routing, workspace-trust filtering, and abort-aware calls.
 - **12 new vitest tests** in `tests/mcpToolAdapter.test.ts`.
+- **Diff-panel apply flow.** `diff/accept*` and `diff/reject*` host
+  handlers now persist per-hunk decisions, create a rollback checkpoint, apply
+  accepted file changes to disk once the diff is fully decided, and clear
+  rejected/rolled-back previews.
+- **5 new vitest tests** in `tests/diffSession.test.ts`.
 
 ### Notes
 - Mode preference intentionally stays out of `nexus.*` settings, avoiding
@@ -47,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   project entries override user entries by id and are never written by the UI.
 - MCP result content is rendered into transcript-safe text markers; image and
   resource payloads are not inlined.
+- Accepted diff previews write only accepted hunks/files and snapshot the
+  previous contents before touching disk.
 
 ## [0.1.0+stage18] — Stage 18: Queue persistence
 

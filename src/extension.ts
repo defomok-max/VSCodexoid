@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { buildToolUiBridge } from "./core/tools/uiBridgeAdapter";
 import { NexusWebviewProvider } from "./webview/webviewProvider";
 import { SettingsStore } from "./core/storage/settingsStore";
@@ -32,10 +34,19 @@ import { runAgent } from "./core/agent/agentRunner";
 import { parseContextRefs, stripContextRefs } from "./core/context/contextRef";
 import { buildContextChunks, packContext } from "./core/context/contextBuilder";
 import { loadNexusRules } from "./core/rules/rulesLoader";
+import {
+  isDiffSessionResolved,
+  materializeAcceptedFiles,
+  setAllDecision,
+  setFileDecision,
+  setHunkDecision,
+  type DiffSession,
+} from "./core/edit/diffSession";
 import type {
   AppState,
   AttachmentRef,
   ChatMessage,
+  DiffPreviewFile,
   McpToolDescriptor,
   ModelInfo,
   ProviderProfile,
@@ -140,6 +151,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const queueManager = new QueueManager();
   const taskManager = new TaskManager();
   const approvalGate = new ApprovalGate();
+  let diffSession: DiffSession | undefined;
   let activeRunController: AbortController | undefined;
 
   // Hydrate task history from persisted globalState so "recent tasks" survives
@@ -200,6 +212,7 @@ export function activate(context: vscode.ExtensionContext): void {
     queuePaused: queueManager.isPaused(),
     agentBusy: !!activeRunController,
     workspaceTrusted: vscode.workspace.isTrusted,
+    diff: diffSession ? { taskId: diffSession.taskId, files: diffSession.files } : undefined,
   });
 
   const post = (msg: HostToWebview) => provider.postMessage(msg);
@@ -269,6 +282,10 @@ export function activate(context: vscode.ExtensionContext): void {
     taskManager,
     approvalGate,
     checkpointManager,
+    getDiffSession: () => diffSession,
+    setDiffSession: (session: DiffSession | undefined) => {
+      diffSession = session;
+    },
     mcpManager,
     mcpConfigStore,
     getMcpServers: () => [...mcpServers],
@@ -352,6 +369,8 @@ interface RunnerDeps {
   taskManager: TaskManager;
   approvalGate: ApprovalGate;
   checkpointManager: CheckpointManager;
+  getDiffSession: () => DiffSession | undefined;
+  setDiffSession: (session: DiffSession | undefined) => void;
   mcpManager: McpManager;
   mcpConfigStore: McpConfigStore;
   getMcpServers: () => import("./shared/types").McpServerConfig[];
@@ -489,6 +508,48 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
       }
       return;
     }
+    case "diff/acceptHunk": {
+      const session = deps.runnerDeps.getDiffSession();
+      if (!session || session.taskId !== msg.taskId) return;
+      const next = setHunkDecision(session, msg.path, msg.hunkId, true).session;
+      await updateDiffSession(next, deps);
+      return;
+    }
+    case "diff/rejectHunk": {
+      const session = deps.runnerDeps.getDiffSession();
+      if (!session || session.taskId !== msg.taskId) return;
+      const next = setHunkDecision(session, msg.path, msg.hunkId, false).session;
+      await updateDiffSession(next, deps);
+      return;
+    }
+    case "diff/acceptFile": {
+      const session = deps.runnerDeps.getDiffSession();
+      if (!session || session.taskId !== msg.taskId) return;
+      const next = setFileDecision(session, msg.path, true).session;
+      await updateDiffSession(next, deps);
+      return;
+    }
+    case "diff/rejectFile": {
+      const session = deps.runnerDeps.getDiffSession();
+      if (!session || session.taskId !== msg.taskId) return;
+      const next = setFileDecision(session, msg.path, false).session;
+      await updateDiffSession(next, deps);
+      return;
+    }
+    case "diff/acceptAll": {
+      const session = deps.runnerDeps.getDiffSession();
+      if (!session || session.taskId !== msg.taskId) return;
+      await updateDiffSession(setAllDecision(session, true), deps);
+      return;
+    }
+    case "diff/rollback": {
+      const session = deps.runnerDeps.getDiffSession();
+      if (!session || session.taskId !== msg.taskId) return;
+      deps.runnerDeps.setDiffSession(undefined);
+      post({ type: "diff/clear" });
+      post({ type: "toast", level: "info", message: "Pending diff discarded." });
+      return;
+    }
     case "command/run": {
       // The webview cannot call `executeCommand` directly. We forward only
       // commands on a small, deliberate allowlist (see
@@ -573,6 +634,74 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
     default:
       // Other messages are accepted silently; later stages add real handlers.
       return;
+  }
+}
+
+async function updateDiffSession(session: DiffSession | undefined, deps: MessageDeps): Promise<void> {
+  const { post, runnerDeps } = deps;
+  if (!session) {
+    runnerDeps.setDiffSession(undefined);
+    post({ type: "diff/clear" });
+    return;
+  }
+  runnerDeps.setDiffSession(session);
+  post({ type: "diff/show", taskId: session.taskId, files: session.files });
+  if (!isDiffSessionResolved(session)) return;
+  const acceptedFiles = materializeAcceptedFiles(session);
+  if (acceptedFiles.length === 0) {
+    runnerDeps.setDiffSession(undefined);
+    post({ type: "diff/clear" });
+    post({ type: "toast", level: "info", message: "Diff rejected; no files changed." });
+    return;
+  }
+  try {
+    const security = buildSecurityBridge(runnerDeps.workspaceRoot);
+    const checkpointFiles = await readCheckpointFiles(acceptedFiles, security);
+    await runnerDeps.checkpointManager.create("before accepting diff", session.taskId, checkpointFiles);
+    await writeAcceptedFiles(acceptedFiles, runnerDeps.workspaceRoot, security);
+    runnerDeps.setDiffSession(undefined);
+    post({ type: "diff/clear" });
+    post({ type: "toast", level: "success", message: `Applied ${acceptedFiles.length} accepted file(s).` });
+  } catch (e) {
+    post({ type: "toast", level: "error", message: `Apply diff failed: ${(e as Error).message}` });
+  }
+}
+
+async function readCheckpointFiles(
+  files: DiffPreviewFile[],
+  security: ReturnType<typeof buildSecurityBridge>,
+): Promise<{ path: string; content: string }[]> {
+  const snapshots: { path: string; content: string }[] = [];
+  for (const file of files) {
+    const abs = security.resolveWorkspacePath(file.path);
+    if (security.isIgnored(abs)) throw new Error(`path "${file.path}" is ignored by .nexusignore`);
+    let content = "";
+    try {
+      content = await fs.readFile(abs, "utf8");
+    } catch (e) {
+      const err = e as NodeJS.ErrnoException;
+      if (err.code !== "ENOENT") throw err;
+    }
+    snapshots.push({ path: file.path, content });
+  }
+  return snapshots;
+}
+
+async function writeAcceptedFiles(
+  files: DiffPreviewFile[],
+  workspaceRoot: string | undefined,
+  security: ReturnType<typeof buildSecurityBridge>,
+): Promise<void> {
+  if (!workspaceRoot) throw new Error("no workspace root — cannot apply diff");
+  for (const file of files) {
+    const abs = security.resolveWorkspacePath(file.path);
+    if (security.isIgnored(abs)) throw new Error(`path "${file.path}" is ignored by .nexusignore`);
+    if (file.after === "") {
+      await fs.rm(abs, { force: true });
+      continue;
+    }
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, file.after, "utf8");
   }
 }
 
@@ -738,6 +867,7 @@ async function startTask(
         });
         post({ type: "task/toolEnd", taskId: task.id, toolCallId: ev.toolCallId, ok: ev.ok, resultPreview: ev.resultPreview, errorMessage: ev.errorMessage });
       } else if (ev.type === "diff") {
+        runnerDeps.setDiffSession({ taskId: task.id, files: ev.files });
         post({ type: "diff/show", taskId: task.id, files: ev.files });
       } else if (ev.type === "task_end") {
         runnerDeps.taskManager.setStatus(task.id, ev.reason === "completed" ? "completed" : ev.reason === "stopped" ? "cancelled" : "failed");

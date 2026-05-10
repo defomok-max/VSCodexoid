@@ -173,6 +173,12 @@ The final PR target is `dev → main`.
   - `extension.ts` MCP `tools` listener now also reconciles into `toolRegistry`. The bridge races every `callTool` against the task's `AbortSignal`, so task cancellation aborts in-flight MCP calls instead of waiting them out.
   - +12 vitest tests in `tests/mcpToolAdapter.test.ts`.
 
+- [x] **Stage 24 — Diff-panel apply flow**
+  - `core/edit/diffSession.ts` — pure helpers for immutable per-hunk/file/all accept/reject decisions, resolved-state checks, and materializing only accepted file changes.
+  - `extension.ts` now stores the active diff preview and handles `diff/acceptHunk`, `diff/rejectHunk`, `diff/acceptFile`, `diff/rejectFile`, `diff/acceptAll`, and `diff/rollback`.
+  - Fully decided diffs create a checkpoint, write accepted file changes to disk, clear the panel, and toast success; all-rejected diffs clear without touching disk.
+  - +5 vitest tests in `tests/diffSession.test.ts`.
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
