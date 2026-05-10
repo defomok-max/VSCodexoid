@@ -7,7 +7,7 @@ export type ReasoningEffort = "low" | "medium" | "high" | "extreme";
 
 export type ApprovalPolicy = "manual" | "balanced" | "auto-safe" | "full-auto";
 
-export type RiskLevel = "low" | "medium" | "high" | "critical";
+export type RiskLevel = "safe" | "low" | "medium" | "high" | "critical";
 
 export type ProviderType =
   | "openai-compatible"

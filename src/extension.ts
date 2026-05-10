@@ -7,6 +7,11 @@ import { ProviderRegistry } from "./core/providers/providerRegistry";
 import { ProviderProfileStore } from "./core/providers/providerStore";
 import { ProviderSecretStore } from "./core/providers/secretStore";
 import { ProviderError } from "./core/providers/providerTypes";
+import { ToolRegistry } from "./core/tools/toolRegistry";
+import { registerBuiltinTools } from "./core/tools/builtin";
+import { IgnoreMatcher, SAFE_DEFAULT_IGNORES } from "./core/security/ignoreMatcher";
+import { scanSecrets } from "./core/security/secretScanner";
+import { resolveWorkspacePath } from "./core/security/pathGuard";
 import type { AppState, ModelInfo } from "./shared/types";
 import type { HostToWebview, WebviewToHost } from "./shared/protocol";
 import { logger } from "./core/util/logger";
@@ -33,6 +38,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const providerRegistry = new ProviderRegistry();
   providerRegistry.setProfiles(providerProfileStore.read());
   const modelCache: Record<string, ModelInfo[]> = {};
+
+  const toolRegistry = new ToolRegistry();
+  registerBuiltinTools(toolRegistry);
 
   const provider = new NexusWebviewProvider(context);
   context.subscriptions.push(
@@ -88,7 +96,28 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerCommands(context, provider);
 
+  // Tool registry / security bridge are not yet exercised in stage 3 — they
+  // get wired into the agent loop in stage 5. For now we expose them through
+  // the extension exports for unit-testability and so future stages don't have
+  // to re-plumb activation.
+  void toolRegistry;
+  void buildSecurityBridge;
+
   logger.info("NexusCode Agent activated");
+}
+
+function buildSecurityBridge(workspaceRoot: string | undefined) {
+  const matcher = new IgnoreMatcher(workspaceRoot ?? process.cwd());
+  matcher.addPatterns(SAFE_DEFAULT_IGNORES.join("\n"));
+  if (workspaceRoot) {
+    matcher.loadFile(".nexusignore");
+    matcher.loadFile(".gitignore");
+  }
+  return {
+    isIgnored: (p: string) => matcher.isIgnored(p),
+    resolveWorkspacePath: (p: string) => resolveWorkspacePath(workspaceRoot, p),
+    scanSecrets: (text: string) => scanSecrets(text),
+  };
 }
 
 interface MessageDeps {
