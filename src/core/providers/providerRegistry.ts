@@ -4,6 +4,7 @@ import { AnthropicProvider } from "./anthropic";
 import { GoogleGeminiProvider } from "./googleGemini";
 import { OllamaProvider } from "./ollama";
 import { CustomHttpProvider } from "./customHttp";
+import { BedrockProvider } from "./bedrock";
 import type { LLMProvider } from "./providerTypes";
 
 /**
@@ -12,8 +13,9 @@ import type { LLMProvider } from "./providerTypes";
  * LM Studio, LocalAI, Azure OpenAI) are OpenAI-compatible — they all reuse
  * `OpenAICompatibleProvider` and just differ in `baseUrl` / model id.
  *
- * AWS Bedrock and Hugging Face Inference are routed through `customHttp` for
- * the MVP — wrappers can be added later without changing call sites.
+ * AWS Bedrock has a dedicated SigV4-signed adapter (`BedrockProvider`) using
+ * the unified Converse / ConverseStream APIs. Hugging Face Inference is
+ * still routed through the OpenAI-compatible adapter for the MVP.
  */
 export function buildProvider(profile: ProviderProfile): LLMProvider {
   switch (profile.type) {
@@ -25,6 +27,8 @@ export function buildProvider(profile: ProviderProfile): LLMProvider {
       return new OllamaProvider(profile);
     case "custom-http":
       return new CustomHttpProvider(profile);
+    case "aws-bedrock":
+      return new BedrockProvider(profile);
     case "openai-compatible":
     case "openrouter":
     case "groq":
@@ -39,7 +43,6 @@ export function buildProvider(profile: ProviderProfile): LLMProvider {
     case "azure-openai":
     case "cohere":
     case "huggingface":
-    case "aws-bedrock":
       return new OpenAICompatibleProvider(profile);
   }
 }
@@ -225,5 +228,14 @@ export const DEFAULT_PROFILES: ProviderProfile[] = [
     defaultModel: "local-model",
     streaming: true,
     toolCallingFormat: "openai",
+  },
+  {
+    id: "aws-bedrock",
+    name: "AWS Bedrock",
+    type: "aws-bedrock",
+    baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+    apiKeySecretRef: "aws-bedrock",
+    defaultModel: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    streaming: true,
   },
 ];
