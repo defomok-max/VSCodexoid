@@ -50,6 +50,11 @@ function buildCtx(opts: BuildCtxOpts = {}): ToolContext {
       restore: async () => 0,
       list: () => [],
     },
+    flow: {
+      setTodo: () => undefined,
+      enqueue: () => ({ id: "q_test", createdAt: Date.now() }),
+      recordSummary: () => undefined,
+    },
   };
 }
 

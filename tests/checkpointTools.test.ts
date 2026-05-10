@@ -41,6 +41,11 @@ function buildCtx(root: string, manager: CheckpointManager): ToolContext {
       restore: (id, ws) => manager.restore(id, ws),
       list: () => manager.list(),
     },
+    flow: {
+      setTodo: () => undefined,
+      enqueue: () => ({ id: "q_test", createdAt: Date.now() }),
+      recordSummary: () => undefined,
+    },
     taskId: "task-1",
   };
 }

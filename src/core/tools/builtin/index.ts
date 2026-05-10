@@ -30,6 +30,13 @@ import {
   restoreCheckpointTool,
   rollbackCheckpointTool,
 } from "./checkpointTools";
+import {
+  askUserTool,
+  queueMessageTool,
+  showDiffTool,
+  summarizeSessionTool,
+  updateTodoListTool,
+} from "./flowTools";
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(readFileTool);
@@ -61,6 +68,12 @@ export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(listCheckpointsTool);
   reg.register(restoreCheckpointTool);
   reg.register(rollbackCheckpointTool);
+
+  reg.register(askUserTool);
+  reg.register(showDiffTool);
+  reg.register(updateTodoListTool);
+  reg.register(queueMessageTool);
+  reg.register(summarizeSessionTool);
 }
 
 export const BUILTIN_TOOL_IDS = [
@@ -88,4 +101,9 @@ export const BUILTIN_TOOL_IDS = [
   "list_checkpoints",
   "restore_checkpoint",
   "rollback_checkpoint",
+  "ask_user",
+  "show_diff",
+  "update_todo_list",
+  "queue_message",
+  "summarize_session",
 ];

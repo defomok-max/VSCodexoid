@@ -128,6 +128,12 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 15 — Agent flow tools**
+  - 5 new built-in tools (`ask_user`, `show_diff`, `update_todo_list`, `queue_message`, `summarize_session`); registry 24 → 29
+  - `ToolContext` gains `flow: ToolFlowBridge` (with `setTodo` / `enqueue` / `recordSummary`); `AgentRunDeps` threads it through; host wires it via `taskManager` / `queueManager`
+  - `show_diff` reuses the existing `ToolResult.diff → diff/show` pipeline (no new protocol)
+  - +12 vitest tests on a flow-spy → **167 total**
+
 - [x] **Stage 14 — Session persistence**
   - `SessionStore` activated (was `void`-d since stage 5); recent tasks now survive extension reload via `globalState`
   - `taskManager.seed(sessionStore.recentTasks())` on activation, `sessionStore.saveTask(stripTransient(task))` on every terminal status transition (`completed`/`failed`/`cancelled`); streaming hot path untouched

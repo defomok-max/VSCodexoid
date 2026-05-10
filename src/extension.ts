@@ -469,6 +469,25 @@ async function startTask(
           restore: (id, root) => runnerDeps.checkpointManager.restore(id, root),
           list: () => runnerDeps.checkpointManager.list(),
         },
+        flow: {
+          setTodo: (taskId, items) => {
+            runnerDeps.taskManager.setTodo(taskId, items);
+          },
+          enqueue: (item) => {
+            const created = runnerDeps.queueManager.add({
+              text: item.text,
+              priority: item.priority ?? 0,
+              modeOverride: item.modeOverride,
+              providerOverride: item.providerOverride,
+              modelOverride: item.modelOverride,
+            });
+            post({ type: "state/patch", patch: { queue: runnerDeps.queueManager.list() } });
+            return { id: created.id, createdAt: created.createdAt };
+          },
+          recordSummary: (taskId, summary) => {
+            runnerDeps.taskManager.update(taskId, { finalSummary: summary });
+          },
+        },
         workspaceRoot: runnerDeps.workspaceRoot,
         requestApproval: (req) => runnerDeps.approvalGate.request(req),
       },

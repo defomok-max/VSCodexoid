@@ -58,8 +58,41 @@ export interface ToolContext {
    * `rollback_checkpoint` tools.
    */
   checkpoints: ToolCheckpointBridge;
+  /**
+   * Agent flow bridge; backs `update_todo_list`, `queue_message`,
+   * `summarize_session` (which mutate the active task / queue).
+   */
+  flow: ToolFlowBridge;
   /** Identifier of the current task (when invoked from the agent loop). */
   taskId?: string;
+}
+
+export interface ToolFlowBridge {
+  /** Replace the current task's checklist (used by `update_todo_list`). */
+  setTodo(taskId: string, items: ToolTodoItem[]): void;
+  /**
+   * Append a queued message that will be picked up by the agent runner on
+   * its next idle iteration. Used by `queue_message`.
+   */
+  enqueue(item: ToolQueueItemInput): { id: string; createdAt: number };
+  /**
+   * Record a final summary on the current task; used by `summarize_session`.
+   */
+  recordSummary(taskId: string, summary: string): void;
+}
+
+export interface ToolTodoItem {
+  id: string;
+  text: string;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+}
+
+export interface ToolQueueItemInput {
+  text: string;
+  priority?: number;
+  modeOverride?: string;
+  providerOverride?: string;
+  modelOverride?: string;
 }
 
 export interface ToolCheckpointBridge {
