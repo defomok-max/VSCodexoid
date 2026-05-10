@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Tooling refresh.** `@typescript-eslint/eslint-plugin` and
+  `@typescript-eslint/parser` bumped from `^7.16.0` to `^8.59.2` (drops the
+  `unsupported TypeScript version` warning under TS 5.9). `@vscode/vsce` bumped
+  from `^2.31.0` to `^3.9.1`. `caniuse-lite` refreshed via
+  `update-browserslist-db@latest`. Lockfile regenerated.
+- **README.md** rewritten to reflect actual provider coverage (native Cohere /
+  HuggingFace / Bedrock; AWS Bedrock is no longer a placeholder), workspace
+  indexing, multimodal input, workspace-trust gate, diff-panel apply flow,
+  cost/usage dashboard, persistence, and MCP transports. Added a
+  `## Status` section listing settings flags whose backend is not yet wired
+  (`nexus.enableSemanticIndex`, `nexus.enableBrowserTools`,
+  `nexus.enableTelemetry`).
+
 ### Added
 - **Persisted current-mode preference.** `core/storage/preferencesStore.ts`
   stores ephemeral UI preferences in VS Code `globalState`. The extension now
