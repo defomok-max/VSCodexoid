@@ -5,6 +5,41 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 14: Session persistence
+
+### Added
+- **`SessionStore` is now activated** (it existed since stage 5 but was
+  intentionally idled with `void SessionStore`). Recent tasks now survive an
+  extension reload:
+  - On activation, `taskManager.seed(sessionStore.recentTasks())` rehydrates
+    the in-memory task store from `globalState`.
+  - On every terminal task transition (`completed` / `failed` / `cancelled`),
+    a stripped copy is persisted via `sessionStore.saveTask`.
+  - The streaming hot path is **not** touched — saves only happen once per
+    completed task to keep `globalState` writes cheap.
+- `task/clear` is now wired in the message handler — clears both the in-memory
+  `TaskManager` and persisted `SessionStore`, then patches the webview with
+  empty `recentTasks` / `currentTask`.
+- `TaskManager` gains:
+  - `seed(tasks)` — populate from persisted history without firing
+    `onUpdate` (avoids storming the webview during activation).
+  - `clear()` — drop every task and reset `currentId`.
+- `RunnerDeps` gains `sessionStore: SessionStore` so message handlers can
+  reach it.
+- `stripTransient(task)` helper trims runaway `resultPreview`s (256 char cap)
+  before each persisted write.
+
+### Tests
+- `tests/sessionStore.test.ts` (9 cases) — fake `Memento` Map-backed shim
+  exercises empty-load, save/reload roundtrip, dedup-by-id, newest-first
+  ordering, max truncation, `clear()`, plus 3 cases for
+  `TaskManager.seed`/`clear`. **Total: 146 → 155 tests passing.**
+
+### Notes
+- `SessionStore.saveTask` already had `max = 30` baked in as a parameter; the
+  default is preserved. We could expose it through `nexus.history.maxTasks`
+  setting in a follow-up.
+
 ## [Unreleased] — Stage 13: Checkpoint tools
 
 ### Added

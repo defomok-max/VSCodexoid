@@ -128,6 +128,14 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 14 — Session persistence**
+  - `SessionStore` activated (was `void`-d since stage 5); recent tasks now survive extension reload via `globalState`
+  - `taskManager.seed(sessionStore.recentTasks())` on activation, `sessionStore.saveTask(stripTransient(task))` on every terminal status transition (`completed`/`failed`/`cancelled`); streaming hot path untouched
+  - `task/clear` message wired: clears both `TaskManager` and `SessionStore`, patches webview
+  - `TaskManager` gains `seed(tasks)` (no `onUpdate` fan-out) and `clear()`
+  - `RunnerDeps` gains `sessionStore: SessionStore`
+  - +9 vitest tests on a Map-backed fake `Memento` → **155 total**
+
 - [x] **Stage 13 — Checkpoint tools**
   - 4 new built-in tools (`create_checkpoint`, `list_checkpoints`, `restore_checkpoint`, `rollback_checkpoint`); registry 20 → 24
   - `ToolContext` gains `checkpoints: ToolCheckpointBridge` (+ optional `taskId`); `AgentRunDeps` threads it through; host wires it as a thin pass-through to the existing `CheckpointManager`
