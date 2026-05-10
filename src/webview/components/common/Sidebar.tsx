@@ -4,6 +4,7 @@ import { useAppStore } from "../../stores/appStore";
 const items: { id: ViewId; label: string; icon: string }[] = [
   { id: "chat", label: "Chat", icon: "💬" },
   { id: "tasks", label: "Tasks", icon: "🗂" },
+  { id: "usage", label: "Usage", icon: "Σ" },
   { id: "diff", label: "Diff", icon: "±" },
   { id: "providers", label: "Providers", icon: "⚡" },
   { id: "modes", label: "Modes", icon: "◐" },

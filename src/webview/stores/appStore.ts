@@ -6,6 +6,7 @@ import { vscode } from "../bridge/vscode";
 export type ViewId =
   | "chat"
   | "tasks"
+  | "usage"
   | "diff"
   | "settings"
   | "providers"
