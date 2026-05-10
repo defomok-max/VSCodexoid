@@ -5,6 +5,41 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 22: Workspace-trust UI banner
+
+### Added
+- **`webview/components/common/TrustBanner.tsx`** — a persistent banner
+  shown at the top of the sidebar (under TopBar, above the main view
+  router) when `state.workspaceTrusted === false`. Explains the
+  read-only restriction and offers a one-click "Manage trust" button
+  that opens the built-in `workbench.trust.manage` dialog.
+- **`core/security/commandAllowlist.ts`** — small, deliberate allowlist
+  of VS Code commands the webview is permitted to invoke via the
+  `command/run` protocol message:
+  - `workbench.trust.manage` (used by TrustBanner)
+  - `workbench.action.openSettings`
+  - `workbench.action.reloadWindow`
+  Anything else falls through to a warn log + an error toast.
+- **`extension.ts` `command/run` handler** — the protocol message was
+  declared in Stage 1 but never wired. The host now consults the
+  allowlist, calls `vscode.commands.executeCommand`, and surfaces any
+  failure as a toast.
+- **+5 vitest tests** in `tests/commandAllowlist.test.ts` covering the
+  positive cases, the rejection of empty / unknown commands, an explicit
+  denylist of destructive commands (terminal, save, quit…), and a
+  no-mutation check on the allowlist constant. **Total: 221 passing** on
+  top of `stage-19/workspace-trust` (216 existing + 5 new).
+
+### Notes
+- This stage stacks on Stage 19. Once Stage 19 lands on `main`, this PR
+  rebases trivially on top of it. `state.workspaceTrusted` and the
+  trust filter were added in #19; this stage just makes them visible
+  and actionable in the UI.
+- The webview is sandboxed and cannot call `vscode.commands.executeCommand`
+  directly. The `command/run` round-trip is the canonical way for the
+  webview to drive VS Code commands; the allowlist keeps that authority
+  scoped to a tiny, deliberate set.
+
 ## [Unreleased] — Stage 19: Workspace-trust gate
 
 ### Added
