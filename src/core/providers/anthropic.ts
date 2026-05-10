@@ -7,6 +7,7 @@ import type {
 import { ProviderError } from "./providerTypes";
 import type { ModelInfo, ProviderProfile } from "../../shared/types";
 import { readSseEvents } from "./util/sse";
+import { toAnthropicImageBlocks } from "./util/multimodal";
 
 /**
  * Anthropic Messages API adapter.
@@ -184,6 +185,9 @@ export class AnthropicProvider implements LLMProvider {
         continue;
       }
       const content: AnthropicContentBlock[] = [];
+      if (m.role === "user") {
+        for (const img of toAnthropicImageBlocks(m)) content.push(img);
+      }
       if (m.content) content.push({ type: "text", text: m.content });
       if (m.role === "assistant" && m.toolCalls) {
         for (const tc of m.toolCalls) {
@@ -271,7 +275,8 @@ interface AnthropicMessage {
 type AnthropicContentBlock =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
-  | { type: "tool_result"; tool_use_id: string; content: string };
+  | { type: "tool_result"; tool_use_id: string; content: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
 
 interface AnthropicMessageResponse {
   content?: { type: string; text?: string; id?: string; name?: string; input?: unknown }[];

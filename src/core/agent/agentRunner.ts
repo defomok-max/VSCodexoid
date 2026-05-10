@@ -39,6 +39,8 @@ export interface AgentRunOptions {
   apiKey?: string;
   modelId: string;
   policy: ApprovalPolicy;
+  /** Inline attachments (e.g. images) carried on the fresh user turn. */
+  attachments?: import("../../shared/types").AttachmentRef[];
 }
 
 export interface AgentRunDeps {
@@ -95,6 +97,7 @@ export async function* runAgent(opts: AgentRunOptions, deps: AgentRunDeps, abort
     opts.transcript ?? [],
     opts.prompt,
     opts.contextChunksText,
+    opts.attachments,
   );
 
   for (let round = 0; round < MAX_ROUNDS; round++) {

@@ -5,11 +5,20 @@ import { QueuePanel } from "../Queue/QueuePanel";
 import { Markdown } from "./Markdown";
 import { ToolCallCard } from "./ToolCallCard";
 import { PlanCard, TodoCard } from "./PlanCard";
+import {
+  fileToImageAttachment,
+  imagesFromClipboard,
+  imagesFromDrop,
+} from "./attachments";
+import type { AttachmentRef } from "../../../shared/types";
 
 export function ChatView() {
   const state = useAppStore((s) => s.state);
   const send = useAppStore((s) => s.send);
+  const pushToast = useAppStore((s) => s.pushToast);
   const [text, setText] = useState("");
+  const [pendingImages, setPendingImages] = useState<AttachmentRef[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   const messages = state.currentTask?.messages ?? [];
   const toolCalls = state.currentTask?.toolCalls ?? [];
   const plan = state.currentTask?.plan ?? [];
@@ -22,12 +31,34 @@ export function ChatView() {
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages.length, state.currentTask?.id]);
 
+  const ingestFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    const accepted: AttachmentRef[] = [];
+    let rejected = 0;
+    for (const f of files) {
+      const att = await fileToImageAttachment(f);
+      if (att) accepted.push(att);
+      else rejected += 1;
+    }
+    if (accepted.length > 0) {
+      setPendingImages((prev) => [...prev, ...accepted]);
+    }
+    if (rejected > 0) {
+      pushToast("warn", `Skipped ${rejected} attachment${rejected === 1 ? "" : "s"} (must be an image ≤5 MB).`);
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    setPendingImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const onSend = (sendNow = false) => {
-    if (!text.trim()) return;
+    if (!text.trim() && pendingImages.length === 0) return;
+    const attachments = pendingImages.length > 0 ? pendingImages : undefined;
     if (state.agentBusy && !sendNow) {
       send({
         type: "queue/add",
-        item: { text, priority: 0 },
+        item: { text, priority: 0, attachments },
       });
     } else {
       send({
@@ -37,13 +68,32 @@ export function ChatView() {
         providerId: state.settings.defaultProviderId,
         modelId: state.settings.defaultModelId,
         sendBehavior: sendNow ? "interrupt-current" : "append-followup",
+        attachments,
       });
     }
     setText("");
+    setPendingImages([]);
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div
+      className={`h-full flex flex-col ${isDragOver ? "ring-2 ring-nexus-accent ring-inset" : ""}`}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes("Files")) {
+          e.preventDefault();
+          setIsDragOver(true);
+        }
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        const files = imagesFromDrop(e.nativeEvent);
+        if (files.length > 0) {
+          e.preventDefault();
+          setIsDragOver(false);
+          void ingestFiles(files);
+        }
+      }}
+    >
       <div ref={scrollerRef} className="flex-1 overflow-auto">
         {messages.length === 0 ? (
           <EmptyState />
@@ -68,7 +118,23 @@ export function ChatView() {
                     {m.role === "tool" ? (
                       <pre className="text-xs whitespace-pre-wrap break-words">{m.content}</pre>
                     ) : (
-                      <Markdown content={m.content || ""} />
+                      <>
+                        {m.attachments && m.attachments.some((a) => a.kind === "image") && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {m.attachments
+                              .filter((a) => a.kind === "image")
+                              .map((a, i) => (
+                                <img
+                                  key={i}
+                                  src={`data:${a.mimeType ?? "image/png"};base64,${a.dataBase64}`}
+                                  alt={a.name ?? `attachment ${i + 1}`}
+                                  className="max-h-48 rounded-lg border border-nexus-border"
+                                />
+                              ))}
+                          </div>
+                        )}
+                        <Markdown content={m.content || ""} />
+                      </>
                     )}
                   </div>
                 </motion.div>
@@ -91,22 +157,51 @@ export function ChatView() {
       <QueuePanel />
       <div className="border-t border-nexus-border bg-nexus-surface px-3 py-3">
         <div className="max-w-3xl mx-auto flex items-end gap-2">
-          <textarea
-            className="nx-input min-h-[64px] resize-y"
-            placeholder={
-              state.agentBusy
-                ? "Agent is working — your message will be queued. Press Send Now to interrupt."
-                : "Ask Nexus to understand, change, test, or review your code…"
-            }
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                onSend(false);
+          <div className="flex-1 flex flex-col gap-2">
+            {pendingImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pendingImages.map((att, idx) => (
+                  <div key={idx} className="relative">
+                    <img
+                      src={`data:${att.mimeType ?? "image/png"};base64,${att.dataBase64}`}
+                      alt={att.name ?? `image ${idx + 1}`}
+                      className="h-16 w-16 object-cover rounded-lg border border-nexus-border"
+                    />
+                    <button
+                      onClick={() => removeImage(idx)}
+                      title="Remove image"
+                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-nexus-surface-2 text-nexus-text text-xs leading-none flex items-center justify-center hover:bg-red-500/80"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <textarea
+              className="nx-input min-h-[64px] resize-y"
+              placeholder={
+                state.agentBusy
+                  ? "Agent is working — your message will be queued. Press Send Now to interrupt."
+                  : "Ask Nexus to understand, change, test, or review your code (paste or drop images for vision models)…"
               }
-            }}
-          />
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                const files = imagesFromClipboard(e.nativeEvent);
+                if (files.length > 0) {
+                  e.preventDefault();
+                  void ingestFiles(files);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  onSend(false);
+                }
+              }}
+            />
+          </div>
           <div className="flex flex-col gap-2">
             <button className="nx-btn nx-btn-primary" onClick={() => onSend(false)}>
               {state.agentBusy ? "Queue" : "Send"}

@@ -128,6 +128,14 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 17d — Multimodal / image input**
+  - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
+  - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
+  - Provider wiring: `OpenAICompatibleProvider`, `AnthropicProvider`, and `GoogleGeminiProvider` now serialize user-message image attachments into their native multimodal shapes (OpenAI `image_url` data URL, Anthropic `image` base64 source, Gemini `inlineData`).
+  - Chat UI: paste-image (`onPaste`), drag-and-drop (`onDragOver` / `onDrop`), thumbnail row above the textarea with per-image remove. Images are previewed inline on user message bubbles. Hard cap 5 MB / image; non-image drops are silently ignored, oversized files surface a warn toast.
+  - Protocol: `task/start` carries `attachments?: AttachmentRef[]`; `agentRunner` forwards them to `buildLlmMessages` so they ride on the new user turn (not on the transcript replay).
+  - +6 vitest cases in `tests/multimodal.test.ts` → **216 total**
+
 - [x] **Stage 17c — Cost & usage dashboard**
   - New webview view: **Usage** (sidebar `Σ` icon). Aggregates the last 30 tasks (`recentTasks`) by provider and by model, with input/output token totals, per-bucket cost, and a relative-cost bar.
   - Pure aggregation lib in `src/webview/components/Usage/usageMath.ts`: `pricingFor`, `costForTask`, `bucketBy`, `aggregateUsage`, `formatUsd`, `formatTokens`. Unit-tested in `tests/usage.test.ts`.

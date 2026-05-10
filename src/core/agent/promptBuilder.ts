@@ -57,12 +57,17 @@ function formatSkill(s: SkillDefinition): string {
  * Builds the LLM-side `messages` array from the task's transcript plus the
  * fresh user turn. We strip webview-only fields (id/ts) which provider
  * adapters don't expect.
+ *
+ * `attachments` (e.g. inline images) are forwarded on the new user message
+ * so vision-capable providers can serialize them into multimodal content
+ * blocks.
  */
 export function buildLlmMessages(
   systemPrompt: string,
   transcript: ChatMessageWebview[],
   userTurn: string,
   contextChunksText?: string,
+  attachments?: import("../../shared/types").AttachmentRef[],
 ): ChatMessageWebview[] {
   const out: ChatMessageWebview[] = [];
   out.push({ id: "sys", role: "system", content: systemPrompt, ts: 0 });
@@ -71,6 +76,12 @@ export function buildLlmMessages(
     contextChunksText && contextChunksText.length > 0
       ? `${contextChunksText}\n\n${userTurn}`
       : userTurn;
-  out.push({ id: "u", role: "user", content: userContent, ts: Date.now() });
+  out.push({
+    id: "u",
+    role: "user",
+    content: userContent,
+    ts: Date.now(),
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
+  });
   return out;
 }

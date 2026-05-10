@@ -5,6 +5,39 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 17d: Multimodal / image input
+
+### Added
+- **Image attachments in chat.** Paste an image (Cmd/Ctrl-V) or drag-and-drop
+  it onto the chat panel to attach it to the next user turn. Thumbnails
+  appear above the textarea with a per-image remove button, and the image
+  also renders inline on the user message bubble after sending.
+- **Provider serialization.** Vision-capable providers translate inline image
+  attachments into their native multimodal content shapes:
+  - **OpenAI / OpenAI-compatible**: `content` becomes an array of
+    `{ type: "text" }` and `{ type: "image_url", image_url: { url } }` blocks
+    (data URLs).
+  - **Anthropic**: user content gets `{ type: "image", source: { type: "base64", media_type, data } }` blocks.
+  - **Google Gemini**: user `parts[]` gain `{ inlineData: { mimeType, data } }` entries.
+- **`AttachmentRef.dataBase64` + `AttachmentRef.name`** for inline raw image
+  bytes (no side-channel), with a 5 MB per-image cap on the webview side.
+- **Pure helpers** in `src/core/providers/util/multimodal.ts`:
+  `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`,
+  `toAnthropicImageBlocks`, `toGeminiParts`.
+- **Protocol.** `task/start` (and the queued `QueueItem`) carry
+  `attachments?: AttachmentRef[]`; `agentRunner` forwards them to
+  `buildLlmMessages` so they ride on the fresh user turn.
+
+### Tests
+- 6 new vitest cases in `tests/multimodal.test.ts`:
+  - `imageAttachments` filters out non-image and missing-data attachments.
+  - `hasImages` reflects presence of inline images.
+  - `toOpenAIContentBlocks` emits text first, then `image_url` data URLs;
+    omits the text block when content is empty.
+  - `toAnthropicImageBlocks` emits base64 source blocks.
+  - `toGeminiParts` emits text first, then `inlineData` parts.
+- Total tests: **204 → 216 passing**.
+
 ## [Unreleased] — Stage 17c: Cost & usage dashboard
 
 ### Added

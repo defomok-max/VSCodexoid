@@ -1,6 +1,7 @@
 import type { ChatDelta, ChatRequest, ChatResponse, LLMProvider } from "./providerTypes";
 import { ProviderError } from "./providerTypes";
 import type { ChatMessage, ModelInfo, ProviderProfile } from "../../shared/types";
+import { imageAttachments } from "./util/multimodal";
 
 /**
  * Google Gemini adapter using the v1beta `generativelanguage` REST API.
@@ -190,8 +191,23 @@ export class GoogleGeminiProvider implements LLMProvider {
   }
 }
 
-function toParts(m: ChatMessage): { text?: string; functionCall?: { name: string; args: unknown } }[] {
-  const parts: { text?: string; functionCall?: { name: string; args: unknown } }[] = [];
+type GeminiPartOut =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
+  | { functionCall: { name: string; args: unknown } };
+
+function toParts(m: ChatMessage): GeminiPartOut[] {
+  const parts: GeminiPartOut[] = [];
+  if (m.role === "user") {
+    for (const img of imageAttachments(m)) {
+      parts.push({
+        inlineData: {
+          mimeType: img.mimeType ?? "image/png",
+          data: img.dataBase64!,
+        },
+      });
+    }
+  }
   if (m.content) parts.push({ text: m.content });
   if (m.role === "assistant" && m.toolCalls) {
     for (const tc of m.toolCalls) {
