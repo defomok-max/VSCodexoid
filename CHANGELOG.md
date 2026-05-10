@@ -5,6 +5,46 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 19: Workspace-trust gate
+
+### Added
+- **`core/security/workspaceTrust.ts`** — host-agnostic trust helpers:
+  `WorkspaceTrustState`, `UNTRUSTED_ALLOWED_CATEGORIES` (the documented
+  read-only allow-list `read | search | diagnostics | todo | ui`),
+  `isToolAllowedWhenUntrusted(tool)` (category gate **AND** static
+  `riskLevel === "safe"` gate), and `filterToolsForTrust(tools, trust)`.
+- **`AgentRunDeps.trusted: boolean`** — the runner now reads the host's
+  current `vscode.workspace.isTrusted` value and filters its tool set
+  *before* the LLM ever sees a tool descriptor. When untrusted, the runner
+  emits a single `error` event explaining that N tools were hidden and how
+  to grant trust.
+- **`extension.ts`** wires `vscode.workspace.isTrusted` into
+  `runAgent` deps, into the broadcast `AppState.workspaceTrusted`, and
+  registers a `vscode.workspace.onDidGrantWorkspaceTrust` listener that
+  patches state and toasts a `"Workspace trusted — …"` confirmation.
+- **`AppState.workspaceTrusted: boolean`** added to the shared protocol so
+  the webview can render a banner / disable inputs based on trust state
+  (UI surfacing is left as a follow-up).
+- **6 new vitest tests** in `tests/workspaceTrust.test.ts`:
+  category allow-list, mutation-category rejects, risk-above-safe rejects,
+  trusted-pass-through, untrusted-filter, allow-list constant.
+
+### Changed
+- `runAgent` now performs an extra trust filter on top of the existing
+  mode + skill filter. The order is
+  `registry → mode/skill allow-list → trust filter → LLM tool descriptors`.
+  Existing approval-gate behavior (manual / balanced / auto-safe / full-auto)
+  is unchanged — it continues to fire on whatever survives the trust filter.
+- `tests/agentRunner.test.ts` updated to set `trusted: true` on the three
+  existing fake `AgentRunDeps`. **Total: 216 vitest tests passing**
+  (210 existing + 6 new) on top of `main`.
+
+### Fixed
+- The `docs/SECURITY` claim that "untrusted workspaces disable shell tools
+  entirely" is now actually true. Previously `vscode.workspace.isTrusted`
+  was not read anywhere in the source tree, so an untrusted workspace had
+  identical tool exposure to a trusted one.
+
 ## [Unreleased] — Stage 17d: Multimodal / image input
 
 ### Added

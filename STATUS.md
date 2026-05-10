@@ -128,6 +128,14 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 19 — Workspace-trust gate**
+  - `core/security/workspaceTrust.ts` — `UNTRUSTED_ALLOWED_CATEGORIES` (read | search | diagnostics | todo | ui), `isToolAllowedWhenUntrusted(tool)` (category gate AND static `riskLevel === "safe"` gate), `filterToolsForTrust(tools, trust)`
+  - `AgentRunDeps.trusted: boolean` — runner filters its tool set before the LLM sees a tool descriptor; emits a single `error` event with the count of hidden tools and how to grant trust
+  - `extension.ts` reads `vscode.workspace.isTrusted` for both the broadcast `AppState.workspaceTrusted` and per-task `runAgent` deps; subscribes to `vscode.workspace.onDidGrantWorkspaceTrust` to patch state and surface a `"Workspace trusted — …"` toast
+  - `AppState.workspaceTrusted: boolean` added to the shared protocol (webview banner is a follow-up)
+  - +6 vitest tests in `tests/workspaceTrust.test.ts`; existing `tests/agentRunner.test.ts` updated for the new `trusted: true` field on three fake deps → **216 total** passing on top of main (224 once Stage 18 lands)
+  - Fixes the `docs/SECURITY` promise that "untrusted workspaces disable shell tools entirely" — `vscode.workspace.isTrusted` was previously not read anywhere
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
