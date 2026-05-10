@@ -15,6 +15,7 @@ export class CheckpointManager {
   private maxCount: number;
   private metaIndex: CheckpointMeta[] = [];
   private inMemory = new Map<string, Map<string, string>>(); // checkpointId → (relPath → content)
+  static readonly MISSING_FILE_SENTINEL = "__NEXUS_CHECKPOINT_MISSING__";
 
   constructor(storageRoot: string, maxCount = 50) {
     this.root = path.join(storageRoot, "checkpoints");
@@ -52,13 +53,19 @@ export class CheckpointManager {
     const dir = path.join(this.root, id);
     await fs.mkdir(dir, { recursive: true });
     const map = new Map<string, string>();
-    const stored: { path: string; bytes: number }[] = [];
+    const stored: { path: string; bytes: number; missing?: boolean }[] = [];
     for (const f of files) {
       const safeName = f.path.replace(/[^a-zA-Z0-9._-]/g, "_");
       const blobPath = path.join(dir, safeName);
-      await fs.writeFile(blobPath, f.content, "utf8");
-      map.set(f.path, f.content);
-      stored.push({ path: f.path, bytes: Buffer.byteLength(f.content, "utf8") });
+      const missing = f.content === CheckpointManager.MISSING_FILE_SENTINEL;
+      const content = missing ? "" : f.content;
+      await fs.writeFile(blobPath, content, "utf8");
+      map.set(f.path, content);
+      stored.push({
+        path: f.path,
+        bytes: Buffer.byteLength(content, "utf8"),
+        ...(missing ? { missing: true } : {}),
+      });
     }
     const meta: CheckpointMeta = {
       id,
@@ -88,6 +95,11 @@ export class CheckpointManager {
       const blobPath = path.join(dir, safeName);
       const content = await fs.readFile(blobPath, "utf8");
       const target = path.join(workspaceRoot, f.path);
+      if (f.missing) {
+        await fs.rm(target, { force: true });
+        n++;
+        continue;
+      }
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, content, "utf8");
       n++;

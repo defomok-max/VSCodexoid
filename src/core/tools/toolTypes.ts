@@ -153,7 +153,7 @@ export interface CheckpointInfo {
   taskId?: string;
   createdAt: number;
   label?: string;
-  files: { path: string; bytes: number }[];
+  files: { path: string; bytes: number; missing?: boolean }[];
 }
 
 export interface ToolUiBridge {

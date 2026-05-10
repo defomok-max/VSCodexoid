@@ -5,7 +5,58 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 18: Queue persistence
+## [Unreleased]
+
+### Added
+- **Persisted current-mode preference.** `core/storage/preferencesStore.ts`
+  stores ephemeral UI preferences in VS Code `globalState`. The extension now
+  restores the last selected mode on activation and writes mode changes through
+  the preferences store, so switching to e.g. `architect` no longer resets to
+  `code` after reload.
+- **6 new vitest tests** in `tests/preferencesStore.test.ts`.
+- **Workspace-trust gate.** `core/security/workspaceTrust.ts` filters the
+  agent tool set down to safe read/search/diagnostics/todo/ui tools when VS
+  Code marks the workspace untrusted. `AppState.workspaceTrusted` lets the
+  webview surface the state.
+- **6 new vitest tests** in `tests/workspaceTrust.test.ts`.
+- **Workspace-trust UI banner.** `TrustBanner` appears when the workspace is
+  untrusted and opens VS Code's trust dialog through an allowlisted
+  `command/run` host bridge.
+- **Command allowlist** for webview-initiated VS Code commands:
+  `workbench.trust.manage`, `workbench.action.openSettings`, and
+  `workbench.action.reloadWindow`.
+- **5 new vitest tests** in `tests/commandAllowlist.test.ts`.
+- **MCP server lifecycle.** User MCP server configs persist in
+  `globalState`, optional `.nexus/mcp.json` project entries are merged
+  read-only, runnable servers auto-start on activation, and `mcp/save`,
+  `mcp/restart`, `mcp/test` handlers manage the running set.
+- **9 new vitest tests** in `tests/mcpLifecycle.test.ts`.
+- **MCP tool execution.** MCP tool descriptors are reconciled into
+  `ToolRegistry` as synthetic network tools, with stable ids/names, standard
+  approval routing, workspace-trust filtering, and abort-aware calls.
+- **12 new vitest tests** in `tests/mcpToolAdapter.test.ts`.
+- **Diff-panel apply flow.** `diff/accept*` and `diff/reject*` host
+  handlers now persist per-hunk decisions, create a rollback checkpoint, apply
+  accepted file changes to disk once the diff is fully decided, and clear
+  rejected/rolled-back previews.
+- **5 new vitest tests** in `tests/diffSession.test.ts`.
+
+### Notes
+- Mode preference intentionally stays out of `nexus.*` settings, avoiding
+  workspace settings churn for a per-user UI choice.
+- In untrusted workspaces, shell/edit/git/network/checkpoint tools are hidden
+  from the LLM before tool descriptors are sent.
+- The webview cannot run arbitrary VS Code commands; `command/run` is scoped to
+  the explicit allowlist above.
+- `.nexus/mcp.json` accepts either a top-level array or `{ "servers": [...] }`;
+  project entries override user entries by id and are never written by the UI.
+- MCP result content is rendered into transcript-safe text markers; image and
+  resource payloads are not inlined.
+- Accepted diff previews write only accepted hunks/files and snapshot the
+  previous contents before touching disk, including a missing-file marker so
+  rolling back a newly created file deletes it again.
+
+## [0.1.0+stage18] — Stage 18: Queue persistence
 
 ### Added
 - **`QueueStore`** (`src/core/storage/queueStore.ts`) — thin

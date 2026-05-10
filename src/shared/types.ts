@@ -278,7 +278,7 @@ export interface CheckpointMeta {
   taskId?: string;
   createdAt: number;
   label?: string;
-  files: { path: string; bytes: number }[];
+  files: { path: string; bytes: number; missing?: boolean }[];
 }
 
 export interface NexusSettings {
@@ -321,6 +321,12 @@ export interface AppState {
   queue: QueueItem[];
   queuePaused: boolean;
   agentBusy: boolean;
+  /**
+   * VS Code workspace-trust state. When false, the host filters the agent's
+   * tool set down to safe read/search/diagnostics/ui/todo operations. The
+   * webview can use this to surface a banner / disable inputs.
+   */
+  workspaceTrusted: boolean;
   pendingApproval?: ApprovalRequest;
   diff?: { taskId: string; files: DiffPreviewFile[] };
 }

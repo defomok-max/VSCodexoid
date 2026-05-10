@@ -47,6 +47,7 @@ const defaultState: AppState = {
   queue: [],
   queuePaused: false,
   agentBusy: false,
+  workspaceTrusted: true,
 };
 
 interface AppStore {

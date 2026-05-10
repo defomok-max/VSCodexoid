@@ -28,6 +28,19 @@ describe("CheckpointManager", () => {
     expect(fs.readFileSync(path.join(workspace, "a.txt"), "utf8")).toBe("old");
   });
 
+  it("restores a missing-file snapshot by deleting the created file", async () => {
+    const cp = new CheckpointManager(storage);
+    await cp.init();
+    const meta = await cp.create("before-create", "task1", [
+      { path: "new.txt", content: CheckpointManager.MISSING_FILE_SENTINEL },
+    ]);
+    expect(meta.files[0].missing).toBe(true);
+    fs.writeFileSync(path.join(workspace, "new.txt"), "new");
+    const restored = await cp.restore(meta.id, workspace);
+    expect(restored).toBe(1);
+    expect(fs.existsSync(path.join(workspace, "new.txt"))).toBe(false);
+  });
+
   it("trims to max count", async () => {
     const cp = new CheckpointManager(storage, 3);
     await cp.init();

@@ -137,6 +137,48 @@ The final PR target is `dev → main`.
   - +8 vitest tests in `tests/queueStore.test.ts` → **218 total** passing
   - Fixes the long-standing JSDoc lie that the host "serializes the queue to globalState whenever a mutation occurs" — the wiring did not exist; pending follow-ups + paused flag now survive a reload
 
+- [x] **Stage 23 — Persisted current-mode preference**
+  - `core/storage/preferencesStore.ts` — thin Memento bucket (`globalState["nexus.preferences"]`) for ephemeral UI preferences. `read()`, merge-on-write `update(partial)` (`undefined` = remove), `clear()`. Tolerates corrupt snapshots (non-object reads back as `{}`).
+  - `extension.ts` reads `preferencesStore.read().currentMode` on activate (default `"code"`), writes through `setCurrentMode`. Switching to non-default mode now survives reload.
+  - +6 vitest tests in `tests/preferencesStore.test.ts`.
+  - Schema-permissive: future preferences (last-used provider/model, sidebar width, …) add optional fields, no migration.
+
+- [x] **Stage 19 — Workspace-trust gate**
+  - `core/security/workspaceTrust.ts` — `UNTRUSTED_ALLOWED_CATEGORIES` (read | search | diagnostics | todo | ui), `isToolAllowedWhenUntrusted(tool)` (category gate AND static `riskLevel === "safe"` gate), `filterToolsForTrust(tools, trust)`
+  - `AgentRunDeps.trusted: boolean` — runner filters its tool set before the LLM sees a tool descriptor; emits a single `error` event with the count of hidden tools and how to grant trust
+  - `extension.ts` reads `vscode.workspace.isTrusted` for both the broadcast `AppState.workspaceTrusted` and per-task `runAgent` deps; subscribes to `vscode.workspace.onDidGrantWorkspaceTrust` to patch state and surface a `"Workspace trusted — …"` toast
+  - `AppState.workspaceTrusted: boolean` added to the shared protocol (webview banner is a follow-up)
+  - +6 vitest tests in `tests/workspaceTrust.test.ts`; existing `tests/agentRunner.test.ts` updated for the new `trusted: true` field on three fake deps
+  - Fixes the `docs/SECURITY` promise that "untrusted workspaces disable shell tools entirely" — `vscode.workspace.isTrusted` was previously not read anywhere
+
+- [x] **Stage 22 — Workspace-trust UI banner**
+  - `webview/components/common/TrustBanner.tsx` — persistent amber banner under TopBar when `state.workspaceTrusted === false`. "Manage trust" button opens the built-in `workbench.trust.manage` dialog via the `command/run` round-trip.
+  - `core/security/commandAllowlist.ts` — `ALLOWED_WEBVIEW_COMMANDS` set (`workbench.trust.manage`, `workbench.action.openSettings`, `workbench.action.reloadWindow`) + `isAllowedWebviewCommand(cmd)` helper.
+  - `extension.ts` `command/run` handler (was declared in Stage 1 but never wired) — consults the allowlist, calls `vscode.commands.executeCommand`, surfaces failures as toasts.
+  - +5 vitest tests in `tests/commandAllowlist.test.ts`.
+
+- [x] **Stage 21 — MCP server lifecycle**
+  - `core/storage/mcpConfigStore.ts` — persists user-scope MCP server configs in `globalState["nexus.mcpServers"]`; optionally merges read-only entries from `<workspace>/.nexus/mcp.json` (project entries override user entries by id). Writes never touch the project file.
+  - `core/mcp/mcpLifecycle.ts` — `reconcileMcpLifecycle(manager, desired)` diffs against `manager.runningServerIds()` and applies minimum start/stop calls (server runnable iff `enabled && autoStart !== false`). `restartMcpServer(manager, cfg)` for the `mcp/restart` UI action.
+  - `McpManager.runningServerIds()` — required primitive.
+  - `extension.ts` activation hydrate: load merged server list → broadcast via `state.mcpServers` → reconcile lifecycle so `autoStart` servers come online.
+  - Webview message handlers wired: `mcp/save` (persist + reconcile + broadcast + toast counts), `mcp/restart` (find cfg → `restartMcpServer`), `mcp/test` (start-if-needed → `listTools` → toast tool count → stop if it wasn't running before the probe).
+  - +9 vitest tests in `tests/mcpLifecycle.test.ts`.
+  - Together with Stage 20 (MCP tool execution), this completes the MCP loop: configured server starts on activate → its tools register in `toolRegistry` → agent can call them under mode / skill / workspace-trust filters.
+
+- [x] **Stage 20 — MCP tool execution**
+  - `core/mcp/mcpToolAdapter.ts` — `buildMcpToolDefinition(descriptor, bridge)` returns a `ToolDefinition` proxying to the MCP server. `formatMcpResult` folds multi-block MCP responses into the agent transcript (text joined with `\n\n`, image/resource blocks shown as compact markers — no inline base64).
+  - `core/mcp/mcpToolReconciler.ts` — `reconcileMcpTools(registry, next, bridge)` diffs descriptor sets and applies the minimal `register` / `unregister` calls; returns `{added, removed, kept}` so the host logs a one-line summary on each MCP `tools` event.
+  - `ToolRegistry.unregister(id)` + `ToolRegistry.idsStartingWith(prefix)` — primitives the reconciler needs.
+  - `extension.ts` MCP `tools` listener now also reconciles into `toolRegistry`. The bridge races every `callTool` against the task's `AbortSignal`, so task cancellation aborts in-flight MCP calls instead of waiting them out.
+  - +12 vitest tests in `tests/mcpToolAdapter.test.ts`.
+
+- [x] **Stage 24 — Diff-panel apply flow**
+  - `core/edit/diffSession.ts` — pure helpers for immutable per-hunk/file/all accept/reject decisions, resolved-state checks, and materializing only accepted file changes.
+  - `extension.ts` now stores the active diff preview and handles `diff/acceptHunk`, `diff/rejectHunk`, `diff/acceptFile`, `diff/rejectFile`, `diff/acceptAll`, and `diff/rollback`.
+  - Fully decided diffs create a checkpoint, write accepted file changes to disk, clear the panel, and toast success; all-rejected diffs clear without touching disk. Newly created files use a missing-file checkpoint marker so rollback deletes them instead of restoring an empty file.
+  - +5 vitest tests in `tests/diffSession.test.ts`; +1 checkpoint manager regression for rollback of newly created files.
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
