@@ -15,6 +15,27 @@ export class ToolRegistry {
     this.tools.set(t.id, t as ToolDefinition);
   }
 
+  /**
+   * Removes a tool by id. Returns `true` if the tool was registered and is
+   * now removed, `false` if it was never registered. Used by the MCP layer
+   * to drop tools when a server stops or its tool list changes.
+   */
+  unregister(id: string): boolean {
+    return this.tools.delete(id);
+  }
+
+  /**
+   * Returns the ids of tools whose ids start with the given prefix. Used by
+   * the MCP layer to enumerate tools synthesised for a given server.
+   */
+  idsStartingWith(prefix: string): string[] {
+    const out: string[] = [];
+    for (const id of this.tools.keys()) {
+      if (id.startsWith(prefix)) out.push(id);
+    }
+    return out;
+  }
+
   get(id: string): ToolDefinition | undefined {
     return this.tools.get(id);
   }

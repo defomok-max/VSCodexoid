@@ -5,6 +5,49 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 20: MCP tool execution
+
+### Added
+- **`core/mcp/mcpToolAdapter.ts`** — builds a `ToolDefinition` that proxies
+  to an MCP server tool. Helpers: `mcpToolId(serverId, name)` (registry id),
+  `mcpToolName(serverId, name)` (LLM-facing identifier, sanitized to
+  `^[A-Za-z0-9_-]+$`), `isMcpToolId(id)`, `formatMcpResult(result)` (folds
+  multi-block content into a single transcript string — text concatenated
+  with double newlines, image/resource blocks rendered as compact markers).
+- **`core/mcp/mcpToolReconciler.ts`** — `reconcileMcpTools(registry, next,
+  bridge)` diffs the next set of MCP tool descriptors against the currently
+  registered set and applies the minimal `register` / `unregister` calls.
+  Returns `{added, removed, kept}` so the host can log a one-line summary.
+- **`ToolRegistry.unregister(id)`** and **`ToolRegistry.idsStartingWith(prefix)`**
+  — the missing primitives the reconciler needs.
+- **`extension.ts` MCP wiring** — the existing `tools` listener on
+  `McpManager` now also reconciles MCP tools into `toolRegistry`. The bridge
+  races each `callTool` against the task's `AbortSignal` so cancelling a
+  task aborts in-flight MCP calls instead of waiting for them to finish.
+- **+12 vitest tests** in `tests/mcpToolAdapter.test.ts`. **Total: 222
+  passing** on top of `main` (210 existing + 12 new).
+
+### Changed
+- The agent runner already reads `toolRegistry.list()` for tool descriptors.
+  As soon as MCP servers populate the registry, the agent sees those tools
+  alongside the built-ins. Mode / skill / workspace-trust filters all
+  apply: MCP tools are tagged `category: "network"` so the workspace-trust
+  gate hides them when a workspace is untrusted (matching the policy for
+  HTTP tools).
+- Approval routing for MCP tools follows the descriptor's `riskLevel`
+  (default `medium`), so they go through the standard
+  `manual / balanced / auto-safe / full-auto` evaluation.
+
+### Notes
+- This stage delivers tool *execution*. **Server lifecycle** — reading
+  `.nexus/mcp.json`, persisting `mcp/save`, handling `mcp/restart` /
+  `mcp/test`, auto-starting servers on activate — is the next stage.
+- Today the MCP UI surfaces configured servers and exchanges `mcp/*`
+  protocol messages, but the host still ignores `mcp/save` etc. Once a
+  user manually populates `mcpManager` (e.g. via tests or a follow-up
+  Stage 21), this stage's wiring lights up automatically with no
+  additional changes to the runner.
+
 ## [Unreleased] — Stage 17d: Multimodal / image input
 
 ### Added

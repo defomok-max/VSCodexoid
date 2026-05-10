@@ -17,6 +17,7 @@ import { SkillRegistry } from "./core/skills/skillRegistry";
 import { BUILT_IN_SKILLS } from "./core/skills/builtInSkills";
 import { loadProjectSkills } from "./core/skills/skillLoader";
 import { McpManager } from "./core/mcp/mcpManager";
+import { reconcileMcpTools } from "./core/mcp/mcpToolReconciler";
 import { CheckpointManager } from "./core/checkpoint/checkpointManager";
 import { WorkspaceIndex } from "./core/indexing/workspaceIndex";
 import { QueueManager } from "./core/agent/queueManager";
@@ -78,10 +79,32 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const mcpTools: McpToolDescriptor[] = [];
   const mcpManager = new McpManager();
+  const mcpCallBridge = {
+    async callTool(serverId: string, toolName: string, args: unknown, signal: AbortSignal) {
+      const client = mcpManager.getClient(serverId);
+      if (!client) throw new Error(`mcp server ${serverId} not running`);
+      // Honor task cancellation: race the call against the abort signal so a
+      // long-running MCP tool does not block task abort.
+      const callP = client.callTool(toolName, args);
+      if (!signal) return callP;
+      return await Promise.race([
+        callP,
+        new Promise<never>((_, reject) => {
+          const onAbort = () => reject(new Error("aborted"));
+          if (signal.aborted) onAbort();
+          else signal.addEventListener("abort", onAbort, { once: true });
+        }),
+      ]);
+    },
+  };
   mcpManager.setListeners({
     tools: (descriptors) => {
       mcpTools.length = 0;
       mcpTools.push(...descriptors);
+      const summary = reconcileMcpTools(toolRegistry, descriptors, mcpCallBridge);
+      logger.info(
+        `mcp tools reconciled: +${summary.added} -${summary.removed} =${summary.kept}`,
+      );
       post({ type: "state/patch", patch: { mcpTools: [...mcpTools] } });
     },
     status: (id, status, info) => {
