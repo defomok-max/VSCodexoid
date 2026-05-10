@@ -171,6 +171,7 @@ export function activate(context: vscode.ExtensionContext): void {
     queue: queueManager.list(),
     queuePaused: queueManager.isPaused(),
     agentBusy: !!activeRunController,
+    workspaceTrusted: vscode.workspace.isTrusted,
   });
 
   const post = (msg: HostToWebview) => provider.postMessage(msg);
@@ -202,6 +203,22 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
   );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      logger.info("workspace trust granted — unlocking full tool set");
+      post({ type: "state/patch", patch: { workspaceTrusted: true } });
+      post({
+        type: "toast",
+        level: "success",
+        message: "Workspace trusted — shell, edit, and git tools are now available.",
+      });
+    }),
+  );
+
+  if (!vscode.workspace.isTrusted) {
+    logger.info("workspace not trusted — agent restricted to read-only tools");
+  }
 
   registerCommands(context, provider, {
     indexWorkspace: workspaceIndex
@@ -547,6 +564,7 @@ async function startTask(
             }
           : undefined,
         workspaceRoot: runnerDeps.workspaceRoot,
+        trusted: vscode.workspace.isTrusted,
         requestApproval: (req) => runnerDeps.approvalGate.request(req),
       },
       ctrl.signal,

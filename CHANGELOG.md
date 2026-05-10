@@ -14,10 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the preferences store, so switching to e.g. `architect` no longer resets to
   `code` after reload.
 - **6 new vitest tests** in `tests/preferencesStore.test.ts`.
+- **Workspace-trust gate.** `core/security/workspaceTrust.ts` filters the
+  agent tool set down to safe read/search/diagnostics/todo/ui tools when VS
+  Code marks the workspace untrusted. `AppState.workspaceTrusted` lets the
+  webview surface the state.
+- **6 new vitest tests** in `tests/workspaceTrust.test.ts`.
 
 ### Notes
 - Mode preference intentionally stays out of `nexus.*` settings, avoiding
   workspace settings churn for a per-user UI choice.
+- In untrusted workspaces, shell/edit/git/network/checkpoint tools are hidden
+  from the LLM before tool descriptors are sent.
 
 ## [0.1.0+stage18] — Stage 18: Queue persistence
 

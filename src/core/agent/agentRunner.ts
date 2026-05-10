@@ -23,6 +23,7 @@ import type {
 import type { ToolRegistry } from "../tools/toolRegistry";
 import { evaluateApproval } from "../approval/approvalManager";
 import { buildDiffPreview } from "../edit/patchEngine";
+import { filterToolsForTrust } from "../security/workspaceTrust";
 import type { AgentEvent } from "./agentEvents";
 import { buildLlmMessages, buildSystemPrompt } from "./promptBuilder";
 
@@ -52,6 +53,12 @@ export interface AgentRunDeps {
   /** Optional workspace index; backs `find_symbol` / `lexical_search` / `refresh_index`. */
   index?: ToolIndexBridge;
   workspaceRoot: string | undefined;
+  /**
+   * VS Code workspace-trust state. When false, the runner filters its tool
+   * set down to read-only / inspect-only categories before the LLM sees
+   * them — see `core/security/workspaceTrust.ts`.
+   */
+  trusted: boolean;
   /** Awaits user decision for an approval request. Resolved by the host. */
   requestApproval: (req: ApprovalRequest) => Promise<ApprovalDecision>;
   /** Map of accepted file diffs from the previous turn (for context). */
@@ -77,7 +84,18 @@ export async function* runAgent(opts: AgentRunOptions, deps: AgentRunDeps, abort
   yield { type: "task_start", taskId: opts.taskId };
 
   const allowedToolIds = filterTools(opts.mode, opts.matchedSkills, deps.toolRegistry.ids());
-  const tools = deps.toolRegistry.list({ allowed: allowedToolIds });
+  const baseTools = deps.toolRegistry.list({ allowed: allowedToolIds });
+  const tools = filterToolsForTrust(baseTools, { isTrusted: deps.trusted });
+  if (!deps.trusted && tools.length < baseTools.length) {
+    yield {
+      type: "error",
+      message:
+        "workspace is not trusted — " +
+        `${baseTools.length - tools.length} tool(s) hidden from the agent ` +
+        "(only safe read/search/diagnostics/ui/todo tools are available). " +
+        "Use `Workspaces: Manage Workspace Trust` to grant trust.",
+    };
+  }
   const toolDescriptors: ChatTool[] = tools.map((t) => ({
     name: t.name,
     description: t.description,
