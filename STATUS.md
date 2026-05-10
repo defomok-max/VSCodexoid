@@ -128,6 +128,15 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 18 — Queue persistence**
+  - `QueueStore` (`src/core/storage/queueStore.ts`) — `vscode.Memento`-backed mirror keyed at `nexus.queue.items` / `nexus.queue.paused`; tolerates malformed payloads (non-array → `[]`, truthy paused → `true`)
+  - `QueueManager.onChange(cb)` mutation listener; fires on every state change (`add`/`remove`/`edit`/`move`/`sendNow`/`popNext`/`clear`/`setPaused`); `hydrate` does not fire to avoid persist ping-pong on activate; listener errors are isolated
+  - `QueueManager.hydrate` filters out terminal-status items (`sent`/`cancelled`/`failed`) and clamps survivors back to `queued`, so a stale memento never resurrects already-sent messages
+  - `QueueManager.setPaused` is now a no-op when the value is unchanged
+  - `extension.ts` activation: hydrates the queue once and registers a single `onChange` listener that calls `queueStore.save(...)` (fire-and-forget with a `logger.warn` fallback)
+  - +8 vitest tests in `tests/queueStore.test.ts` → **218 total** passing
+  - Fixes the long-standing JSDoc lie that the host "serializes the queue to globalState whenever a mutation occurs" — the wiring did not exist; pending follow-ups + paused flag now survive a reload
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
