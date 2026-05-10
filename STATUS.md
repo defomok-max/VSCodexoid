@@ -22,19 +22,18 @@ The final PR target is `dev → main`.
   - `.nexusrules`, `.nexusignore`, README, LICENSE, `.vscode/launch.json`
   - Typecheck / build / vitest / lint all pass
 
-- [~] **Stage 2 — Provider system**
-  - Provider registry & profiles
-  - SecretStorage-backed API key store
-  - OpenAI-compatible adapter (chat + streaming + listModels) — covers OpenAI, Groq, DeepSeek, xAI, Together, Fireworks, Perplexity, Mistral, OpenRouter, LM Studio, LocalAI, Azure-style endpoints
-  - Anthropic adapter (Messages API, streaming)
-  - Google Gemini adapter (generateContent + SSE)
-  - Ollama adapter (local listModels + streaming)
-  - Generic Custom HTTP provider (user-defined body template, response path, streaming parser)
-  - Provider profile JSON schema
-  - Real Providers UI (add / edit / delete profile, set API key, refresh model list, mark default)
-  - Vitest tests for adapters
+- [x] **Stage 2 — Provider system**
+  - Provider registry & profile store (`globalState`-backed) with 13 default profiles seeded
+  - `SecretStorage`-backed `ProviderSecretStore` for API keys
+  - `OpenAICompatibleProvider` (chat / stream / listModels, Bearer or `api-key` header) — covers OpenAI, Groq, DeepSeek, xAI, Together, Fireworks, Perplexity, Mistral, OpenRouter, LM Studio, LocalAI, Azure-style endpoints
+  - `AnthropicProvider` (Messages API, content blocks, tool_use / tool_result, SSE, thinking budgets for `high`/`extreme` reasoning effort)
+  - `GoogleGeminiProvider` (`generateContent` + `streamGenerateContent?alt=sse`)
+  - `OllamaProvider` (NDJSON streaming, `/api/tags`)
+  - `CustomHttpProvider` (user-defined body template + response path + sse/ndjson parser, query/header/bearer auth)
+  - Real Providers UI: add / edit / delete profile, edit base URL & default model, save API key, refresh model list, set default
+  - 17 vitest tests for SSE parser, path picker, all 5 adapters, and registry
 
-- [ ] **Stage 3 — Tools, approval, security**
+- [~] **Stage 3 — Tools, approval, security**
   - Tool registry (Zod schemas, risk levels, audit log)
   - Built-in tools: read/write/edit/create/delete/rename file, list_files, search_files, grep, get_symbols, get_diagnostics, get_open_files, get_selection, get_terminal_output, run_terminal_command, run_test_command, get_git_status, get_git_diff, create_git_branch, stage_files, commit_changes, create_checkpoint, restore_checkpoint, rollback_checkpoint, fetch_url, ask_user, show_diff, apply_patch, format_files, install_dependency, update_todo_list, queue_message
   - Approval manager + 4 policies (manual / balanced / auto-safe / full-auto)
