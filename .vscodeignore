@@ -14,3 +14,11 @@ postcss.config.cjs
 vitest.config.ts
 docs/**
 .nexus/**
+.nexusrules
+.nexusignore
+STATUS.md
+CHANGELOG.md
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+.github/**
