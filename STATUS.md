@@ -105,6 +105,11 @@ The final PR target is `dev → main`.
   - `media/icon.png` added so vsce no longer fails on the missing marketplace icon
   - `.vscodeignore` cleaned: `pnpm-lock.yaml`, `STATUS.md`, `CHANGELOG.md`, `.nexus*`, lockfiles, and `.github/` are excluded from the package
 
+- [x] **Stage 8 — GitHub Actions CI**
+  - `.github/workflows/ci.yml`: typecheck + lint + test + package on every PR/push to `dev` or `main`, uploads the `.vsix` as a build artifact
+  - Node 20 + pnpm 9 + ubuntu-latest, 10-minute timeout
+  - `CHANGELOG.md` and `docs/CONTRIBUTING.md` updated to reference CI
+
 - [ ] **Final** — open `dev → main` PR with full summary, screenshots, and how-to-test
 
 ---

@@ -154,8 +154,9 @@ For project-specific skills users can drop a JSON file into
   commit messages are fine (`feat:`, `fix:`, `docs:`, `chore:`, etc.).
 - A PR description should answer: *what changed, why, how to verify*.
 - Run `pnpm run typecheck && pnpm run lint && pnpm run test` locally before
-  opening a PR. CI is being added — until it lands, please don't rely on it
-  to catch regressions.
+  opening a PR. CI runs the same checks plus `pnpm run package` on every PR
+  targeting `dev` or `main` (see `.github/workflows/ci.yml`); the produced
+  `.vsix` is uploaded as a build artifact for that run.
 
 ## License
 
