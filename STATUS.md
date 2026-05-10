@@ -128,6 +128,14 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 16 — Write/build tools**
+  - 4 new built-in tools (`apply_patch`, `format_files`, `run_test_command`, `install_dependency`); registry 29 → **33**
+  - `apply_patch`: structured-hunk apply via `applyHunkMask`, returns `ToolResult.diff` (no direct disk writes); rejects mismatched / overlapping / out-of-range hunks
+  - `format_files` / `run_test_command` / `install_dependency`: shared `runShell` (cwd-bound spawn, secret scrub, terminal capture, abort, 120s timeout); `install_dependency` auto-detects package manager
+  - `run_test_command` uses dynamic `assessCommandRisk` on custom commands
+  - +12 vitest tests → **179 total**
+  - **All mode-manifest gaps closed** — the registry now matches every tool name referenced from `COMMON_TOOLS` / `EDIT_TOOLS` / `SHELL_TOOLS` / `GIT_TOOLS`
+
 - [x] **Stage 15 — Agent flow tools**
   - 5 new built-in tools (`ask_user`, `show_diff`, `update_todo_list`, `queue_message`, `summarize_session`); registry 24 → 29
   - `ToolContext` gains `flow: ToolFlowBridge` (with `setTodo` / `enqueue` / `recordSummary`); `AgentRunDeps` threads it through; host wires it via `taskManager` / `queueManager`

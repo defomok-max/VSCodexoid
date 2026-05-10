@@ -5,6 +5,54 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 16: Write/build tools
+
+### Added
+- **4 new built-in tools** in `core/tools/builtin/buildTools.ts`, completing
+  the long-standing gap with mode manifests. Registry **29 → 33**:
+  - `apply_patch` (medium) — applies a structured array of hunks
+    (`{startLineBefore, beforeText, afterText}`) to a single file. The tool
+    re-computes the result via `applyHunkMask` and surfaces a `ToolResult.diff`
+    for the existing approval pipeline; **does not write directly to disk**.
+    Validates each hunk's `beforeText` matches the on-disk content,
+    detects overlapping hunks, refuses ignored / oversized files, and
+    handles missing files (treats as empty `before`).
+  - `format_files` (medium) — runs the project formatter (default
+    `pnpm exec prettier --write`) over the listed workspace-relative paths.
+    Refuses ignored paths up front. Supports a `command` override.
+  - `run_test_command` (low/dynamic) — runs the project test command
+    (default `pnpm test`) with optional `pattern` for filtering. Risk is
+    `assessCommandRisk(...)` when a custom command is given.
+  - `install_dependency` (high) — installs a single npm package via the
+    detected package manager (auto-detect from `pnpm-lock.yaml` /
+    `yarn.lock` / `package-lock.json`, fallback `npm`); supports `dev: true`.
+    The package name is restricted by Zod regex to forbid traversal /
+    arbitrary characters.
+- A shared `runShell` helper inside `buildTools.ts` mirrors
+  `terminalTool.ts`: cwd-bound `spawn`, 64 KiB output cap, secret scrub,
+  `recordTerminalOutput` push so `get_terminal_output` sees these runs too,
+  120s default timeout, abort propagation. Non-zero exit codes surface as
+  `error` so the agent can decide to retry / give up.
+
+### Tests
+- 12 new vitest cases in `tests/buildTools.test.ts`:
+  - `apply_patch`: simple swap, ignored path, mismatched `beforeText`,
+    out-of-range hunk, overlapping hunks, no-op (`after === before`).
+  - `install_dependency`: invalid package-name rejection, scoped name
+    acceptance, abort-before-spawn safety.
+  - `run_test_command` and `format_files`: schema validation +
+    `format_files` ignored-path early refusal.
+- **Total: 167 → 179 tests passing.**
+
+### Notes
+- `apply_patch` mirrors the structure of `DiffHunk` so existing webview diff
+  rendering applies; the per-hunk approve/reject in the diff panel works
+  out of the box.
+- `format_files` and `run_test_command` rely on the workspace already having
+  the relevant binaries (`prettier`, `vitest`, etc.). Auto-installing is
+  intentionally out of scope — the agent should call `install_dependency`
+  separately if needed.
+
 ## [Unreleased] — Stage 15: Agent flow tools
 
 ### Added

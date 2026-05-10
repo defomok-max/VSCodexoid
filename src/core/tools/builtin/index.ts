@@ -37,6 +37,12 @@ import {
   summarizeSessionTool,
   updateTodoListTool,
 } from "./flowTools";
+import {
+  applyPatchTool,
+  formatFilesTool,
+  installDependencyTool,
+  runTestCommandTool,
+} from "./buildTools";
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(readFileTool);
@@ -74,6 +80,11 @@ export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(updateTodoListTool);
   reg.register(queueMessageTool);
   reg.register(summarizeSessionTool);
+
+  reg.register(applyPatchTool);
+  reg.register(formatFilesTool);
+  reg.register(runTestCommandTool);
+  reg.register(installDependencyTool);
 }
 
 export const BUILTIN_TOOL_IDS = [
@@ -106,4 +117,8 @@ export const BUILTIN_TOOL_IDS = [
   "update_todo_list",
   "queue_message",
   "summarize_session",
+  "apply_patch",
+  "format_files",
+  "run_test_command",
+  "install_dependency",
 ];

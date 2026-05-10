@@ -64,7 +64,7 @@ src/
   core/
     agent/                    — agent runner, queue, task manager, approval gate
     providers/                — LLM adapters + registry + default profiles
-    tools/                    — ToolRegistry + 29 built-in tools
+    tools/                    — ToolRegistry + 33 built-in tools
     skills/                   — registry, loader, 20 built-in skills
     mcp/                      — JSON-RPC stdio MCP client + manager
     approval/                 — policy matrix + dynamic command risk
