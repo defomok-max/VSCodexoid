@@ -122,3 +122,86 @@ export const refreshIndexTool: ToolDefinition<Record<string, never>> = {
     };
   },
 };
+
+export const semanticSearchTool: ToolDefinition<{
+  query: string;
+  k?: number;
+  filePattern?: string;
+}> = {
+  id: "semantic_search",
+  name: "semantic_search",
+  description:
+    "Find code snippets by *meaning* rather than literal tokens. Embeds the query with the configured embeddings provider and returns the top-k matching chunks (file, line range, score, snippet). Falls back gracefully when the semantic index is disabled or no embeddings provider is configured. Pair with 'lexical_search' for keyword recall.",
+  category: "search",
+  riskLevel: "safe",
+  schema: z.object({
+    query: z.string().min(1).max(2000),
+    k: z.number().int().min(1).max(50).optional(),
+    filePattern: z.string().min(1).max(200).optional(),
+  }),
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Natural-language description of what you're looking for." },
+      k: { type: "integer", minimum: 1, maximum: 50, description: "Number of results (default 10)." },
+      filePattern: {
+        type: "string",
+        description: "Case-insensitive substring filter on file paths (e.g. 'src/core/agent').",
+      },
+    },
+    required: ["query"],
+  },
+  async execute(args, ctx) {
+    if (!ctx.index || typeof ctx.index.semanticSearch !== "function") {
+      return {
+        content: "",
+        error:
+          "semantic search is not available — enable 'nexus.enableSemanticIndex' and configure an embeddings provider (nexus.embeddingProvider + nexus.embeddingModel).",
+      };
+    }
+    const k = args.k ?? 10;
+    const hits = await ctx.index.semanticSearch(args.query, {
+      k,
+      filePattern: args.filePattern,
+      signal: ctx.signal,
+    });
+    if (hits.length === 0) {
+      return { content: `no semantic matches for ${JSON.stringify(args.query)}`, data: [] };
+    }
+    const lines = hits.map((h) => {
+      const sym = h.symbolName ? ` (${h.symbolKind ?? "symbol"} ${h.symbolName})` : "";
+      const head = `${h.filePath}:${h.startLine}-${h.endLine}\tscore=${h.score.toFixed(3)}${sym}`;
+      return `${head}\n${h.snippet}`;
+    });
+    return { content: lines.join("\n\n"), data: hits };
+  },
+};
+
+export const refreshSemanticIndexTool: ToolDefinition<{ force?: boolean }> = {
+  id: "refresh_semantic_index",
+  name: "refresh_semantic_index",
+  description:
+    "(Re)build the semantic index. Walks the workspace, chunks every supported file, embeds new/changed chunks, and persists the vector store. Pass force=true to ignore the on-disk snapshot and rebuild from scratch.",
+  category: "search",
+  riskLevel: "low",
+  schema: z.object({ force: z.boolean().optional() }),
+  parameters: {
+    type: "object",
+    properties: { force: { type: "boolean" } },
+    additionalProperties: false,
+  },
+  async execute(args, ctx) {
+    if (!ctx.index || typeof ctx.index.refreshSemantic !== "function") {
+      return {
+        content: "",
+        error:
+          "semantic index is not available — enable 'nexus.enableSemanticIndex' and configure an embeddings provider.",
+      };
+    }
+    const stats = await ctx.index.refreshSemantic({ force: args.force, signal: ctx.signal });
+    return {
+      content: `semantic index: ${stats.files} files, ${stats.chunks} chunks (${stats.model}, dim=${stats.dimensions ?? "?"})`,
+      data: stats,
+    };
+  },
+};

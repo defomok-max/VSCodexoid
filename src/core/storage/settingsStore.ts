@@ -22,6 +22,11 @@ export class SettingsStore {
       enableMcp: cfg.get<boolean>("enableMcp", true),
       enableSkills: cfg.get<boolean>("enableSkills", true),
       enableBrowserTools: cfg.get<boolean>("enableBrowserTools", false),
+      enableSemanticIndex: cfg.get<boolean>("enableSemanticIndex", false),
+      embeddingProvider: cfg.get<string>("embeddingProvider", ""),
+      embeddingModel: cfg.get<string>("embeddingModel", ""),
+      embeddingDimensions: optionalNumber(cfg.get<number | null>("embeddingDimensions", null)),
+      embeddingMaxChunkChars: cfg.get<number>("embeddingMaxChunkChars", 4000),
       ui: {
         theme: cfg.get<Theme>("ui.theme", "system"),
         compactMode: cfg.get<boolean>("ui.compactMode", false),
@@ -53,6 +58,11 @@ export class SettingsStore {
     if (partial.enableMcp !== undefined) await cfg.update("enableMcp", partial.enableMcp, target);
     if (partial.enableSkills !== undefined) await cfg.update("enableSkills", partial.enableSkills, target);
     if (partial.enableBrowserTools !== undefined) await cfg.update("enableBrowserTools", partial.enableBrowserTools, target);
+    if (partial.enableSemanticIndex !== undefined) await cfg.update("enableSemanticIndex", partial.enableSemanticIndex, target);
+    if (partial.embeddingProvider !== undefined) await cfg.update("embeddingProvider", partial.embeddingProvider, target);
+    if (partial.embeddingModel !== undefined) await cfg.update("embeddingModel", partial.embeddingModel, target);
+    if (partial.embeddingDimensions !== undefined) await cfg.update("embeddingDimensions", partial.embeddingDimensions, target);
+    if (partial.embeddingMaxChunkChars !== undefined) await cfg.update("embeddingMaxChunkChars", partial.embeddingMaxChunkChars, target);
     if (partial.ui) {
       if (partial.ui.theme !== undefined) await cfg.update("ui.theme", partial.ui.theme, target);
       if (partial.ui.compactMode !== undefined) await cfg.update("ui.compactMode", partial.ui.compactMode, target);
@@ -73,4 +83,8 @@ export class SettingsStore {
     if (partial.ignorePatterns !== undefined) await cfg.update("ignorePatterns", partial.ignorePatterns, target);
     if (partial.customInstructions !== undefined) await cfg.update("customInstructions", partial.customInstructions, target);
   }
+}
+
+function optionalNumber(v: number | null | undefined): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined;
 }

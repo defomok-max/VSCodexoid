@@ -81,6 +81,21 @@ export interface ToolIndexBridge {
     opts?: { kind?: string; regex?: boolean; maxResults?: number },
   ): ToolSymbolHit[];
   lexicalSearch(query: string, opts?: { maxResults?: number }): ToolSearchHit[];
+  /**
+   * Optional semantic-search hook. Implemented when
+   * `nexus.enableSemanticIndex` is on and an embeddings provider is wired up;
+   * absent otherwise. Tools must check `typeof bridge.semanticSearch ===
+   * 'function'` before calling and surface a clear error to the LLM when
+   * unavailable.
+   */
+  semanticSearch?(
+    query: string,
+    opts?: { k?: number; filePattern?: string; signal?: AbortSignal },
+  ): Promise<ToolSemanticHit[]>;
+  /** Optional rebuild of the semantic index. */
+  refreshSemantic?(opts?: { force?: boolean; signal?: AbortSignal }): Promise<ToolSemanticStats>;
+  /** Cheap stats for the semantic index, when one is wired up. */
+  semanticStats?(): ToolSemanticStats;
 }
 
 export interface ToolIndexStats {
@@ -88,6 +103,24 @@ export interface ToolIndexStats {
   symbols: number;
   uniqueTerms: number;
   bytesIndexed: number;
+}
+
+export interface ToolSemanticHit {
+  filePath: string;
+  startLine: number;
+  endLine: number;
+  score: number;
+  snippet: string;
+  symbolName?: string;
+  symbolKind?: string;
+}
+
+export interface ToolSemanticStats {
+  files: number;
+  chunks: number;
+  providerId: string;
+  model: string;
+  dimensions: number | undefined;
 }
 
 export interface ToolSymbolHit {

@@ -289,6 +289,15 @@ export interface NexusSettings {
   enableMcp: boolean;
   enableSkills: boolean;
   enableBrowserTools: boolean;
+  enableSemanticIndex: boolean;
+  /** Provider-profile id used to compute embeddings. Empty = use defaultProvider. */
+  embeddingProvider: string;
+  /** Embeddings model name (e.g. 'text-embedding-3-small', 'nomic-embed-text'). */
+  embeddingModel: string;
+  /** Optional override for the embedding output dimensionality (where the provider supports it). */
+  embeddingDimensions: number | undefined;
+  /** Maximum characters per chunk before forcing a split. */
+  embeddingMaxChunkChars: number;
   ui: {
     theme: Theme;
     compactMode: boolean;

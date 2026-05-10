@@ -27,6 +27,7 @@ import { reconcileMcpLifecycle, restartMcpServer } from "./core/mcp/mcpLifecycle
 import { reconcileMcpTools } from "./core/mcp/mcpToolReconciler";
 import { CheckpointManager } from "./core/checkpoint/checkpointManager";
 import { WorkspaceIndex } from "./core/indexing/workspaceIndex";
+import { SemanticIndexHolder } from "./core/indexing/semanticIndexHolder";
 import { QueueManager } from "./core/agent/queueManager";
 import { TaskManager } from "./core/agent/taskManager";
 import { ApprovalGate } from "./core/agent/approvalGate";
@@ -146,6 +147,44 @@ export function activate(context: vscode.ExtensionContext): void {
     // Lazy initial scan; refreshes are cheap on warm caches.
     void workspaceIndex.refresh().catch((e) => logger.warn(`workspace index initial refresh failed: ${(e as Error).message}`));
   }
+
+  // Semantic (embeddings-based) index. Only built when 'nexus.enableSemanticIndex'
+  // is on AND a provider profile + model are configured. Lazy: nothing happens
+  // until the agent calls 'semantic_search' / 'refresh_semantic_index'.
+  const semanticIndexHolder = wsRoot
+    ? new SemanticIndexHolder({
+        workspaceRoot: wsRoot,
+        bridge: { isIgnored: (p) => buildSecurityBridge(wsRoot).isIgnored(p) },
+        readSettings: () => {
+          const s = settingsStore.read();
+          return {
+            enabled: s.enableSemanticIndex,
+            embeddingProvider: s.embeddingProvider,
+            defaultProvider: s.defaultProviderId,
+            embeddingModel: s.embeddingModel,
+            embeddingDimensions: s.embeddingDimensions,
+            embeddingMaxChunkChars: s.embeddingMaxChunkChars,
+          };
+        },
+        resolveProfile: (id) => providerRegistry.list().find((p) => p.id === id),
+        resolveApiKey: (id) => providerSecretStore.get(id),
+        storageDir: path.join(context.globalStorageUri.fsPath, "semantic-index"),
+        log: (m) => logger.info(m),
+      })
+    : undefined;
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (
+        e.affectsConfiguration("nexus.enableSemanticIndex") ||
+        e.affectsConfiguration("nexus.embeddingProvider") ||
+        e.affectsConfiguration("nexus.embeddingModel") ||
+        e.affectsConfiguration("nexus.embeddingDimensions") ||
+        e.affectsConfiguration("nexus.embeddingMaxChunkChars")
+      ) {
+        semanticIndexHolder?.invalidate();
+      }
+    }),
+  );
 
   const queueStore = new QueueStore(context.globalState);
   const queueManager = new QueueManager();
@@ -294,6 +333,7 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     sessionStore,
     workspaceIndex,
+    semanticIndexHolder,
     workspaceRoot: wsRoot,
     getActiveRun: () => activeRunController,
     setActiveRun: (c: AbortController | undefined) => {
@@ -377,6 +417,7 @@ interface RunnerDeps {
   setMcpServers: (s: import("./shared/types").McpServerConfig[]) => void;
   sessionStore: SessionStore;
   workspaceIndex: WorkspaceIndex | undefined;
+  semanticIndexHolder: SemanticIndexHolder | undefined;
   workspaceRoot: string | undefined;
   getActiveRun: () => AbortController | undefined;
   setActiveRun: (c: AbortController | undefined) => void;
@@ -874,7 +915,42 @@ async function startTask(
               stats: () => runnerDeps.workspaceIndex!.stats(),
               findSymbol: (name, opts) =>
                 runnerDeps.workspaceIndex!.findSymbol(name, opts as never),
-              lexicalSearch: (query, opts) => runnerDeps.workspaceIndex!.lexicalSearch(query, opts),
+              lexicalSearch: (query, opts) =>
+                runnerDeps.workspaceIndex!.lexicalSearch(query, opts),
+              semanticSearch: runnerDeps.semanticIndexHolder
+                ? async (query, opts) => {
+                    const r = await runnerDeps.semanticIndexHolder!.search(query, opts);
+                    if (!r.ok) throw new Error(r.reason);
+                    return r.hits;
+                  }
+                : undefined,
+              refreshSemantic: runnerDeps.semanticIndexHolder
+                ? async (opts) => {
+                    const r = await runnerDeps.semanticIndexHolder!.refresh(opts);
+                    if (!r.ok) throw new Error(r.reason);
+                    const stats = await runnerDeps.semanticIndexHolder!.stats();
+                    return {
+                      files: stats.files,
+                      chunks: stats.chunks,
+                      providerId: stats.providerId ?? "",
+                      model: stats.model ?? "",
+                      dimensions: stats.dimensions,
+                    };
+                  }
+                : undefined,
+              semanticStats: runnerDeps.semanticIndexHolder
+                ? () => {
+                    // Synchronous best-effort snapshot. Deeper stats require an
+                    // async holder.stats() call which the agent runner doesn't expose.
+                    return {
+                      files: 0,
+                      chunks: 0,
+                      providerId: "",
+                      model: "",
+                      dimensions: undefined,
+                    };
+                  }
+                : undefined,
             }
           : undefined,
         workspaceRoot: runnerDeps.workspaceRoot,
