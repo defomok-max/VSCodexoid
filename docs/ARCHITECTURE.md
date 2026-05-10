@@ -59,7 +59,7 @@ src/
 │   ├─ checkpoint/            — on-disk file snapshots, restore, trim
 │   ├─ context/               — @file/@folder/@symbol/… refs + token budget packer
 │   ├─ edit/                  — patchEngine: LCS line diff + per-hunk accept/reject
-│   ├─ mcp/                   — JSON-RPC stdio MCP client + lifecycle manager
+│   ├─ mcp/                   — JSON-RPC MCP clients (stdio + HTTP/SSE) + lifecycle manager
 │   ├─ modes/                 — 9 built-in mode profiles (ask, code, debug, …)
 │   ├─ providers/             — 5 LLM adapters + registry + 13 default profiles
 │   ├─ rules/                 — .nexusrules loader → system-prompt section
@@ -350,15 +350,33 @@ Microbenchmark, Localize, Notebook Cleanup).
 
 ## 11. MCP (`core/mcp/`)
 
-`McpStdioClient` speaks **Content-Length-framed JSON-RPC 2.0** over a
-spawned process's stdio (the same framing as LSP, which the MCP spec
-mandates for stdio transport). The client implements `initialize` →
-`notifications/initialized`, `tools/list`, and `tools/call`, with request
-correlation by `id`, configurable timeouts, and an abort-aware `stop()`.
+Three transports are supported, all implementing the same `McpClient`
+interface (`start`, `listTools`, `callTool`, `stop`, `isRunning`,
+`uptimeMs`):
 
-`McpManager` keeps a `Map<id, McpStdioClient>` and aggregates discovered
+- **stdio** (`McpStdioClient`) — spawns a child process and speaks
+  **Content-Length-framed JSON-RPC 2.0** over its stdio (the same framing
+  as LSP, mandated by the MCP spec for stdio transport).
+- **Streamable HTTP** (`McpHttpClient` with `transport: "http"`) — single
+  POST endpoint per MCP spec **2025-03-26**. Each client request is a POST
+  whose response can be either `application/json` or `text/event-stream`
+  (SSE) carrying the JSON-RPC reply plus optional server-initiated
+  notifications. The `Mcp-Session-Id` response header is captured and
+  echoed on subsequent requests.
+- **HTTP+SSE** (`McpHttpClient` with `transport: "sse"`) — legacy
+  transport from MCP spec **2024-11-05**. The client opens a long-lived
+  `GET` for SSE; the first `event: endpoint` announces the POST URL for
+  client-to-server messages; subsequent `event: message` SSE frames
+  deliver server-to-client JSON-RPC replies.
+
+All clients implement `initialize` → `notifications/initialized`,
+`tools/list`, and `tools/call`, with request correlation by `id`,
+configurable timeouts, and abort-aware `stop()`.
+
+`McpManager` keeps a `Map<id, McpClient>` and aggregates discovered
 tools into a single `McpToolDescriptor[]`. Tool aggregation triggers a
-`state/patch { mcpTools }` so the UI updates live.
+`state/patch { mcpTools }` so the UI updates live. The transport is
+selected from `McpServerConfig.type` (`"stdio" | "http" | "sse"`).
 
 HTTP / SSE transports are not yet implemented — `mcpManager.startServer`
 emits an `error` status with the message `transport "<x>" not yet implemented`.
@@ -493,7 +511,7 @@ No work happens until the user interacts with the webview.
 | Custom mode (project)       | `<workspace>/.nexus/modes/<id>.json`                       |
 | New context ref kind        | extend `ContextRefKind` and `resolveRef` in `contextBuilder` |
 | New approval policy         | extend the `ApprovalPolicy` union and the matrix in `evaluateApproval` |
-| New MCP transport           | implement a sibling to `McpStdioClient` and dispatch in `McpManager` |
+| New MCP transport           | implement the `McpClient` interface in a sibling to `McpStdioClient` / `McpHttpClient` and dispatch from `McpManager.createClient` |
 
 For provider adapters, the bar is the `LLMProvider` interface plus capability
 flags. For tools, the bar is a Zod schema + `execute` that propagates
