@@ -128,6 +128,13 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 17b — Native Cohere + HuggingFace provider adapters**
+  - `CohereProvider` (`src/core/providers/cohere.ts`): native `/v2/chat` integration. Translates user / assistant / tool messages into Cohere's content-block + `tool_call_id` shape. Streaming handles `content-delta` / `tool-call-start` / `tool-call-delta` / `message-end` events with usage + finish-reason mapping (`TOOL_CALL` → `tool_calls`, `MAX_TOKENS` → `length`, etc).
+  - `HuggingFaceProvider` (`src/core/providers/huggingface.ts`): native Inference Router (`POST {baseUrl}/v1/chat/completions`) with curated fallback model list. Streaming handles OpenAI-shape SSE chunks plus aggregated `tool_calls` deltas indexed by `index`.
+  - `providerRegistry.buildProvider()` now dispatches `cohere` → `CohereProvider` and `huggingface` → `HuggingFaceProvider` (instead of the previous OpenAI-compatible fallback).
+  - 2 new default profiles: **Cohere** (`command-a-03-2025`) and **Hugging Face** (`meta-llama/Llama-3.3-70B-Instruct`).
+  - +9 vitest cases in `tests/cohereHuggingface.test.ts` → **197 total**
+
 - [x] **Stage 17a — Workspace indexing module**
   - New `src/core/indexing/` module: `WorkspaceIndex` (file metadata + symbol entries + lexical inverted index), `extractSymbols` (regex-based, TS/JS/TSX/JSX/MJS/CJS), `InvertedIndex` (TF·IDF over a Map-of-Maps).
   - 3 new built-in tools: `find_symbol` (substring or regex match, optional `kind` filter), `lexical_search` (whole-file relevance ranking), `refresh_index` (cheap on warm caches).

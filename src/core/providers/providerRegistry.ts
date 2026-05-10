@@ -5,6 +5,8 @@ import { GoogleGeminiProvider } from "./googleGemini";
 import { OllamaProvider } from "./ollama";
 import { CustomHttpProvider } from "./customHttp";
 import { BedrockProvider } from "./bedrock";
+import { CohereProvider } from "./cohere";
+import { HuggingFaceProvider } from "./huggingface";
 import type { LLMProvider } from "./providerTypes";
 
 /**
@@ -14,8 +16,9 @@ import type { LLMProvider } from "./providerTypes";
  * `OpenAICompatibleProvider` and just differ in `baseUrl` / model id.
  *
  * AWS Bedrock has a dedicated SigV4-signed adapter (`BedrockProvider`) using
- * the unified Converse / ConverseStream APIs. Hugging Face Inference is
- * still routed through the OpenAI-compatible adapter for the MVP.
+ * the unified Converse / ConverseStream APIs. Cohere uses its native v2
+ * chat API (`CohereProvider`); Hugging Face uses the Inference Router
+ * (`HuggingFaceProvider`).
  */
 export function buildProvider(profile: ProviderProfile): LLMProvider {
   switch (profile.type) {
@@ -29,6 +32,10 @@ export function buildProvider(profile: ProviderProfile): LLMProvider {
       return new CustomHttpProvider(profile);
     case "aws-bedrock":
       return new BedrockProvider(profile);
+    case "cohere":
+      return new CohereProvider(profile);
+    case "huggingface":
+      return new HuggingFaceProvider(profile);
     case "openai-compatible":
     case "openrouter":
     case "groq":
@@ -41,8 +48,6 @@ export function buildProvider(profile: ProviderProfile): LLMProvider {
     case "lm-studio":
     case "localai":
     case "azure-openai":
-    case "cohere":
-    case "huggingface":
       return new OpenAICompatibleProvider(profile);
   }
 }
@@ -237,5 +242,25 @@ export const DEFAULT_PROFILES: ProviderProfile[] = [
     apiKeySecretRef: "aws-bedrock",
     defaultModel: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     streaming: true,
+  },
+  {
+    id: "cohere",
+    name: "Cohere",
+    type: "cohere",
+    baseUrl: "https://api.cohere.com",
+    apiKeySecretRef: "cohere",
+    defaultModel: "command-a-03-2025",
+    streaming: true,
+    toolCallingFormat: "openai",
+  },
+  {
+    id: "huggingface",
+    name: "Hugging Face",
+    type: "huggingface",
+    baseUrl: "https://router.huggingface.co",
+    apiKeySecretRef: "huggingface",
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct",
+    streaming: true,
+    toolCallingFormat: "openai",
   },
 ];
