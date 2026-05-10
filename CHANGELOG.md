@@ -5,6 +5,37 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 17c: Cost & usage dashboard
+
+### Added
+- **Usage view** in the webview sidebar (`Σ` icon). Shows:
+  - Total cost (USD), total input/output tokens, and average cost per priced
+    task across the most recent 30 tasks (`recentTasks`).
+  - Per-provider and per-model buckets, sorted by cost descending, with a
+    relative-cost bar.
+  - The recent tasks list with per-task input/output tokens and computed
+    cost (or `"no price"` when the provider has no pricing).
+- **Pure aggregation library** at `src/webview/components/Usage/usageMath.ts`:
+  - `pricingFor(task, providers)`: looks up `costPerMillionInput` /
+    `costPerMillionOutput` from the provider profile.
+  - `costForTask(task, providers)`: computes input/output/total USD via
+    `(tokens / 1_000_000) * pricePerM`.
+  - `bucketBy`, `aggregateUsage`: roll up per-provider and per-model totals.
+  - `formatUsd`, `formatTokens`: locale-aware display helpers.
+- New `usage` value added to `ViewId` and the sidebar nav.
+
+### Tests
+- 7 new vitest cases in `tests/usage.test.ts`:
+  - `pricingFor` returns rates when both fields are set; `undefined`
+    otherwise.
+  - `costForTask` scales by 1M tokens correctly; preserves `priced=false`
+    for unpriced providers.
+  - `aggregateUsage` totals match per-bucket sums; buckets sort by cost
+    descending; unpriced provider buckets are kept (cost = $0).
+  - `formatUsd` / `formatTokens`: locale-aware formatting.
+
+**Total: 197 → 204 tests passing.**
+
 ## [Unreleased] — Stage 17b: Native Cohere + HuggingFace adapters
 
 ### Added

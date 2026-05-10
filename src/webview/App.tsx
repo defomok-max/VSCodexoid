@@ -8,6 +8,7 @@ import { McpView } from "./components/MCP/McpView";
 import { SkillsView } from "./components/Skills/SkillsView";
 import { ModesView } from "./components/Modes/ModesView";
 import { TasksView } from "./components/Tasks/TasksView";
+import { UsageView } from "./components/Usage/UsageView";
 import { ApprovalDialog } from "./components/common/ApprovalDialog";
 import { DiffPanel } from "./components/Diff/DiffPanel";
 import { TopBar } from "./components/common/TopBar";
@@ -45,6 +46,7 @@ export function App() {
         <main className="flex-1 min-w-0 overflow-hidden">
           {view === "chat" && <ChatView />}
           {view === "tasks" && <TasksView />}
+          {view === "usage" && <UsageView />}
           {view === "diff" && <DiffPanel />}
           {view === "settings" && <SettingsView />}
           {view === "providers" && <ProvidersView />}

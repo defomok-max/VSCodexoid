@@ -128,6 +128,13 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 17c — Cost & usage dashboard**
+  - New webview view: **Usage** (sidebar `Σ` icon). Aggregates the last 30 tasks (`recentTasks`) by provider and by model, with input/output token totals, per-bucket cost, and a relative-cost bar.
+  - Pure aggregation lib in `src/webview/components/Usage/usageMath.ts`: `pricingFor`, `costForTask`, `bucketBy`, `aggregateUsage`, `formatUsd`, `formatTokens`. Unit-tested in `tests/usage.test.ts`.
+  - Pricing source of truth: `ProviderProfile.costPerMillionInput / costPerMillionOutput` (added back in stage 2). Tasks under unpriced providers (e.g. local Ollama) are bucketed and shown but contribute $0 — `pricedTaskCount` distinguishes them in the summary.
+  - Recent tasks list shows the per-task cost or `"no price"` so the user can see which tasks have pricing data.
+  - +7 vitest cases in `tests/usage.test.ts` → **204 total**
+
 - [x] **Stage 17b — Native Cohere + HuggingFace provider adapters**
   - `CohereProvider` (`src/core/providers/cohere.ts`): native `/v2/chat` integration. Translates user / assistant / tool messages into Cohere's content-block + `tool_call_id` shape. Streaming handles `content-delta` / `tool-call-start` / `tool-call-delta` / `message-end` events with usage + finish-reason mapping (`TOOL_CALL` → `tool_calls`, `MAX_TOKENS` → `length`, etc).
   - `HuggingFaceProvider` (`src/core/providers/huggingface.ts`): native Inference Router (`POST {baseUrl}/v1/chat/completions`) with curated fallback model list. Streaming handles OpenAI-shape SSE chunks plus aggregated `tool_calls` deltas indexed by `index`.
