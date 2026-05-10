@@ -53,7 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - MCP result content is rendered into transcript-safe text markers; image and
   resource payloads are not inlined.
 - Accepted diff previews write only accepted hunks/files and snapshot the
-  previous contents before touching disk.
+  previous contents before touching disk, including a missing-file marker so
+  rolling back a newly created file deletes it again.
 
 ## [0.1.0+stage18] — Stage 18: Queue persistence
 

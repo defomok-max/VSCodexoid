@@ -176,8 +176,8 @@ The final PR target is `dev → main`.
 - [x] **Stage 24 — Diff-panel apply flow**
   - `core/edit/diffSession.ts` — pure helpers for immutable per-hunk/file/all accept/reject decisions, resolved-state checks, and materializing only accepted file changes.
   - `extension.ts` now stores the active diff preview and handles `diff/acceptHunk`, `diff/rejectHunk`, `diff/acceptFile`, `diff/rejectFile`, `diff/acceptAll`, and `diff/rollback`.
-  - Fully decided diffs create a checkpoint, write accepted file changes to disk, clear the panel, and toast success; all-rejected diffs clear without touching disk.
-  - +5 vitest tests in `tests/diffSession.test.ts`.
+  - Fully decided diffs create a checkpoint, write accepted file changes to disk, clear the panel, and toast success; all-rejected diffs clear without touching disk. Newly created files use a missing-file checkpoint marker so rollback deletes them instead of restoring an empty file.
+  - +5 vitest tests in `tests/diffSession.test.ts`; +1 checkpoint manager regression for rollback of newly created files.
 
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.

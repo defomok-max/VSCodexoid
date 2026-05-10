@@ -681,6 +681,7 @@ async function readCheckpointFiles(
     } catch (e) {
       const err = e as NodeJS.ErrnoException;
       if (err.code !== "ENOENT") throw err;
+      content = CheckpointManager.MISSING_FILE_SENTINEL;
     }
     snapshots.push({ path: file.path, content });
   }
