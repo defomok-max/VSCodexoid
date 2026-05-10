@@ -31,6 +31,11 @@ function buildCtx(root: string): ToolContext {
       resolveWorkspacePath: (p) => resolveWorkspacePath(root, p),
       scanSecrets: (s) => scanSecrets(s),
     },
+    checkpoints: {
+      create: async () => ({ id: "cp_test", createdAt: Date.now(), files: [] }),
+      restore: async () => 0,
+      list: () => [],
+    },
   };
 }
 

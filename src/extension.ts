@@ -415,6 +415,12 @@ async function startTask(
           showInputBox: (q) => vscode.window.showInputBox({ prompt: q }),
         }),
         security,
+        checkpoints: {
+          create: (label, taskId, files) =>
+            runnerDeps.checkpointManager.create(label, taskId, files),
+          restore: (id, root) => runnerDeps.checkpointManager.restore(id, root),
+          list: () => runnerDeps.checkpointManager.list(),
+        },
         workspaceRoot: runnerDeps.workspaceRoot,
         requestApproval: (req) => runnerDeps.approvalGate.request(req),
       },

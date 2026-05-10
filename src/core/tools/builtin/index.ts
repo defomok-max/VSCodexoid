@@ -24,6 +24,12 @@ import {
   getSymbolsTool,
   getTerminalOutputTool,
 } from "./workspaceTools";
+import {
+  createCheckpointTool,
+  listCheckpointsTool,
+  restoreCheckpointTool,
+  rollbackCheckpointTool,
+} from "./checkpointTools";
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(readFileTool);
@@ -50,6 +56,11 @@ export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(getDiagnosticsTool);
   reg.register(getSymbolsTool);
   reg.register(getTerminalOutputTool);
+
+  reg.register(createCheckpointTool);
+  reg.register(listCheckpointsTool);
+  reg.register(restoreCheckpointTool);
+  reg.register(rollbackCheckpointTool);
 }
 
 export const BUILTIN_TOOL_IDS = [
@@ -73,4 +84,8 @@ export const BUILTIN_TOOL_IDS = [
   "get_diagnostics",
   "get_symbols",
   "get_terminal_output",
+  "create_checkpoint",
+  "list_checkpoints",
+  "restore_checkpoint",
+  "rollback_checkpoint",
 ];

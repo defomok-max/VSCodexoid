@@ -5,6 +5,51 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 13: Checkpoint tools
+
+### Added
+- **4 new built-in checkpoint tools** wired into `core/tools/builtin/index.ts`,
+  bringing the registry to **24 tools** total. The agent can now create
+  rollback points before risky edits and restore them autonomously:
+  - `create_checkpoint` (safe) — snapshots the listed workspace files; refuses
+    `.nexusignore`d / oversized (>256 KiB) / binary files.
+  - `list_checkpoints` (safe) — newest-first listing with timestamps, file
+    counts, and labels.
+  - `restore_checkpoint` (high) — restores a specific checkpoint by id;
+    refuses to write any path that's now `.nexusignore`d.
+  - `rollback_checkpoint` (high) — convenience wrapper restoring the most
+    recent checkpoint.
+- `ToolContext` extended with `checkpoints: ToolCheckpointBridge` and an
+  optional `taskId`. New shared interface `CheckpointInfo` mirrors
+  `CheckpointMeta` exactly so the host wiring is a 3-line passthrough to
+  `CheckpointManager`.
+- `AgentRunDeps` gained a `checkpoints` field; `agentRunner` now threads
+  the bridge into every `ToolContext`.
+- `COMMON_TOOLS` in built-in modes adds `list_checkpoints` so editor /
+  shell modes can introspect the rollback history.
+- 10 new vitest cases in `tests/checkpointTools.test.ts` exercising the
+  full lifecycle on a real `CheckpointManager` (create with files,
+  ignored / oversized / binary refusals, label-only marker, ordering,
+  restore reverts files, unknown-id error, rollback restores latest,
+  empty-history error, ring-buffer trim to maxCount). **Total: 136 → 146
+  tests passing.**
+
+### Changed
+- `runTerminalCommandTool`, `agentRunner`, and all tests that build a
+  `ToolContext` now provide a `checkpoints` bridge. Existing tests gained
+  a 4-line stub.
+- Risk levels of `restore_checkpoint` / `rollback_checkpoint` are `high`
+  so they trigger the approval gate under `balanced` / `auto-safe`
+  policies and auto-execute under `full-auto`.
+- `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` reflect the 24-tool
+  registry and the new `checkpoint` category.
+
+### Notes
+- The webview-side checkpoint API (`checkpoint/create`,
+  `checkpoint/restore` protocol messages) is still not handled in
+  `extension.ts` `handleMessage` — that's a UI surfacing gap, separate
+  from this PR (the agent path now works end-to-end).
+
 ## [Unreleased] — Stage 12: Workspace inspection tools
 
 ### Added
