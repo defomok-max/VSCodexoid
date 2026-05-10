@@ -43,6 +43,7 @@ import {
   installDependencyTool,
   runTestCommandTool,
 } from "./buildTools";
+import { findSymbolTool, lexicalSearchTool, refreshIndexTool } from "./indexingTools";
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(readFileTool);
@@ -85,6 +86,10 @@ export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(formatFilesTool);
   reg.register(runTestCommandTool);
   reg.register(installDependencyTool);
+
+  reg.register(findSymbolTool);
+  reg.register(lexicalSearchTool);
+  reg.register(refreshIndexTool);
 }
 
 export const BUILTIN_TOOL_IDS = [
@@ -121,4 +126,7 @@ export const BUILTIN_TOOL_IDS = [
   "format_files",
   "run_test_command",
   "install_dependency",
+  "find_symbol",
+  "lexical_search",
+  "refresh_index",
 ];

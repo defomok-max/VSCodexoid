@@ -5,6 +5,51 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 17a: Workspace indexing module
+
+### Added
+- New `src/core/indexing/` module, closing a long-standing documentation gap:
+  - `WorkspaceIndex` — in-memory index of file metadata, extracted symbols,
+    and a lexical inverted index. Skips `.nexusignore` paths, caps at 1 MB
+    per file and 5000 files total, drops binary-looking content, coalesces
+    concurrent refreshes, and skips re-tokenising files whose `mtimeMs` and
+    content hash haven't changed.
+  - `extractSymbols` — regex-based extractor for TS/TSX/JS/JSX/MJS/CJS that
+    surfaces top-level `function` / `class` / `interface` / `type` / `enum` /
+    `namespace` / `const` / `let` declarations, plus class methods (with
+    container) via brace-counting scope tracking.
+  - `InvertedIndex` — Map-of-Maps inverted index with TF·IDF scoring
+    (`freq * log(1 + N / df)`); tokenizer keeps lowercase ASCII tokens
+    `[a-z0-9_]+` of length 2..40.
+- **3 new built-in tools** (registry **33 → 36**):
+  - `find_symbol` (safe) — search the symbol index by name (case-insensitive
+    substring or JS regex); optional `kind` filter.
+  - `lexical_search` (safe) — rank workspace files by lexical relevance to a
+    query. Faster than `grep` on large repos and returns whole-file scores
+    rather than line matches.
+  - `refresh_index` (safe) — re-scan the workspace; returns the new index
+    size. Cheap on warm caches.
+- `nexus.indexWorkspace` command now actually refreshes the index (instead
+  of showing a placeholder toast) and reports `files / symbols / unique
+  terms` once finished.
+- `ToolContext.index?: ToolIndexBridge` (optional, so existing tests and
+  minimal hosts keep compiling); `AgentRunDeps.index` threads the bridge
+  from `extension.ts` to `agentRunner.ts`.
+- All 3 new tools are added to `COMMON_TOOLS`, so every built-in mode (Ask,
+  Architect, Code, Debug, Review, Test, Docs, DevOps, Security) sees them.
+
+### Tests
+- 9 new vitest cases in `tests/indexing.test.ts`:
+  - `extractSymbols`: unsupported file types, full TS surface (functions,
+    classes with methods, types, interfaces, enums, namespaces, const/let),
+    control-flow keywords are not classified as methods.
+  - `InvertedIndex`: tokenizer normalisation, TF·IDF ranking, two-way removal.
+  - `WorkspaceIndex`: respects `isIgnored`, finds symbols across files,
+    re-indexes changed files, drops removed files on refresh, regex matcher
+    narrows symbol search.
+
+**Total: 179 → 188 tests passing.**
+
 ## [Unreleased] — Stage 16: Write/build tools
 
 ### Added

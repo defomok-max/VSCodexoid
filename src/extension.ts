@@ -18,6 +18,7 @@ import { BUILT_IN_SKILLS } from "./core/skills/builtInSkills";
 import { loadProjectSkills } from "./core/skills/skillLoader";
 import { McpManager } from "./core/mcp/mcpManager";
 import { CheckpointManager } from "./core/checkpoint/checkpointManager";
+import { WorkspaceIndex } from "./core/indexing/workspaceIndex";
 import { QueueManager } from "./core/agent/queueManager";
 import { TaskManager } from "./core/agent/taskManager";
 import { ApprovalGate } from "./core/agent/approvalGate";
@@ -92,6 +93,16 @@ export function activate(context: vscode.ExtensionContext): void {
     settingsStore.read().checkpoints?.maxCount ?? 50,
   );
   void checkpointManager.init();
+
+  const workspaceIndex = wsRoot
+    ? new WorkspaceIndex(wsRoot, {
+        isIgnored: (p) => buildSecurityBridge(wsRoot).isIgnored(p),
+      })
+    : undefined;
+  if (workspaceIndex) {
+    // Lazy initial scan; refreshes are cheap on warm caches.
+    void workspaceIndex.refresh().catch((e) => logger.warn(`workspace index initial refresh failed: ${(e as Error).message}`));
+  }
 
   const queueManager = new QueueManager();
   const taskManager = new TaskManager();
@@ -174,11 +185,18 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  registerCommands(context, provider);
+  registerCommands(context, provider, {
+    indexWorkspace: workspaceIndex
+      ? async () => {
+          const stats = await workspaceIndex.refresh();
+          return stats;
+        }
+      : undefined,
+  });
 
   // Snapshot deps for the message handler. The agent runner needs access to
   // most of the wiring, so we close over them in a single object.
-  const runnerDeps = {
+  const runnerDeps: RunnerDeps = {
     toolRegistry,
     skillRegistry,
     settingsStore,
@@ -190,6 +208,7 @@ export function activate(context: vscode.ExtensionContext): void {
     checkpointManager,
     mcpManager,
     sessionStore,
+    workspaceIndex,
     workspaceRoot: wsRoot,
     getActiveRun: () => activeRunController,
     setActiveRun: (c: AbortController | undefined) => {
@@ -250,6 +269,7 @@ interface RunnerDeps {
   checkpointManager: CheckpointManager;
   mcpManager: McpManager;
   sessionStore: SessionStore;
+  workspaceIndex: WorkspaceIndex | undefined;
   workspaceRoot: string | undefined;
   getActiveRun: () => AbortController | undefined;
   setActiveRun: (c: AbortController | undefined) => void;
@@ -488,6 +508,15 @@ async function startTask(
             runnerDeps.taskManager.update(taskId, { finalSummary: summary });
           },
         },
+        index: runnerDeps.workspaceIndex
+          ? {
+              refresh: () => runnerDeps.workspaceIndex!.refresh(),
+              stats: () => runnerDeps.workspaceIndex!.stats(),
+              findSymbol: (name, opts) =>
+                runnerDeps.workspaceIndex!.findSymbol(name, opts as never),
+              lexicalSearch: (query, opts) => runnerDeps.workspaceIndex!.lexicalSearch(query, opts),
+            }
+          : undefined,
         workspaceRoot: runnerDeps.workspaceRoot,
         requestApproval: (req) => runnerDeps.approvalGate.request(req),
       },

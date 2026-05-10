@@ -240,12 +240,12 @@ ToolDefinition<I> = {
 }
 ```
 
-33 built-in tools registered in `core/tools/builtin/index.ts`:
+36 built-in tools registered in `core/tools/builtin/index.ts`:
 
 | Category    | Tools |
 |-------------|-------|
 | read        | `read_file`, `list_files`, `get_open_files`, `get_selection`, `get_symbols`, `get_terminal_output` |
-| search      | `search_files`, `grep` |
+| search      | `search_files`, `grep`, `find_symbol`, `lexical_search`, `refresh_index` |
 | diagnostics | `get_diagnostics` |
 | edit        | `write_file`, `edit_file`, `create_file`, `delete_file`, `rename_file`, `apply_patch` |
 | shell       | `run_terminal_command` (dynamic risk via `assessCommandRisk`), `run_test_command`, `format_files`, `install_dependency` |
@@ -264,6 +264,8 @@ Tool execution is sandboxed by `ToolContext`:
   `vscode.executeDocumentSymbolProvider` command.
 - `security`: `isIgnored(path)`, `resolveWorkspacePath(path)` (traversal guard),
   `scanSecrets(content)` (returns redacted copy + matches).
+- `index?`: optional workspace index; backs `find_symbol`, `lexical_search`,
+  and `refresh_index`. Tests construct a `ToolContext` without it.
 
 The `get_terminal_output` tool reads from a small in-memory ring buffer in
 `core/tools/builtin/terminalCapture.ts` that `run_terminal_command` writes to
@@ -419,7 +421,35 @@ manager trims oldest checkpoints when the count exceeds
 
 ---
 
-## 13. Modes (`core/modes/builtInModes.ts`)
+## 13. Workspace indexing (`core/indexing/`)
+
+`WorkspaceIndex` is an in-memory index built on demand by
+`extension.ts` for the active workspace folder. It backs the
+`find_symbol`, `lexical_search`, and `refresh_index` tools, and the
+`nexus.indexWorkspace` command.
+
+- **`workspaceIndex.ts`** — orchestrator. Holds a `Map<path, FileEntry>`
+  with `{ size, mtimeMs, contentHash, symbols }` per file plus an
+  `InvertedIndex`. `refresh()` walks the workspace, skips ignored paths,
+  caps at 1 MB / file and 5000 files total, drops binary content, and
+  short-circuits unchanged files via `mtimeMs` + content hash. Concurrent
+  refreshes coalesce.
+- **`symbolExtractor.ts`** — regex-based extractor for TS/TSX/JS/JSX/MJS/CJS.
+  Surfaces top-level `function` / `class` / `interface` / `type` / `enum` /
+  `namespace` / `const` / `let` declarations and class methods (with
+  container) via brace-counting scope tracking. Strings, regex literals,
+  and line comments are masked when counting braces.
+- **`lexicalSearch.ts`** — Map-of-Maps inverted index with TF·IDF scoring
+  (`freq * log(1 + N / df)`); tokenizer keeps lowercase ASCII tokens
+  `[a-z0-9_]+` of length 2..40.
+
+The host exposes the index to tools via `ToolContext.index?: ToolIndexBridge`
+and to the agent runner via `AgentRunDeps.index`. Both fields are optional
+so unit tests and minimal hosts can omit them.
+
+---
+
+## 14. Modes (`core/modes/builtInModes.ts`)
 
 9 built-in modes. Each mode defines `systemPrompt`, `allowedTools`,
 `reasoningEffort`, `temperature`, `approvalPolicy`, and `riskTolerance`:
@@ -440,7 +470,7 @@ Custom modes (`.nexus/modes/*.json`) use the same `ModeProfile` shape.
 
 ---
 
-## 14. State management (host & webview)
+## 15. State management (host & webview)
 
 - **Host state** — held in plain TS objects: `SettingsStore`,
   `ProviderProfileStore`, `ProviderSecretStore`, `QueueManager`,
@@ -457,7 +487,7 @@ state live in `globalState`. API keys live in `secretStorage`.
 
 ---
 
-## 15. Build & bundling
+## 16. Build & bundling
 
 `esbuild.config.mjs` produces three artifacts:
 
@@ -475,7 +505,7 @@ vsce uses `--no-dependencies` because esbuild already inlines everything;
 
 ---
 
-## 16. Testing
+## 17. Testing
 
 Vitest with the `node` environment. Tests live in `tests/*.test.ts` and use
 `tests/__mocks__/vscode.ts` to stub the VS Code API surface.
@@ -501,13 +531,13 @@ scaffold          smoke
 
 ---
 
-## 17. Extension activation flow
+## 18. Extension activation flow
 
 `extension.ts → activate(context)`:
 
 1. Build stores: `SettingsStore`, `ProviderProfileStore` (`globalState`),
    `ProviderSecretStore` (`secretStorage`), `ProviderRegistry`.
-2. Build `ToolRegistry`, register the 33 built-in tools.
+2. Build `ToolRegistry`, register the 36 built-in tools.
 3. Build `SkillRegistry`, register the 20 built-in skills, then load any
    project skills from `<workspace>/.nexus/skills`.
 4. Build `McpManager` and wire its `tools`/`status` listeners to webview
@@ -523,7 +553,7 @@ No work happens until the user interacts with the webview.
 
 ---
 
-## 18. Extension points
+## 19. Extension points
 
 | What you want to add        | Where                                                      |
 |-----------------------------|------------------------------------------------------------|
