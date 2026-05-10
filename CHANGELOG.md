@@ -5,7 +5,84 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [Unreleased] — Stage 25: Semantic (embeddings-based) workspace index
+
+### Added
+- **Embeddings provider abstraction** (`core/providers/embeddingsProvider.ts`)
+  — single-method `EmbeddingsProvider` interface that mirrors the chat
+  provider abstraction (`embed(texts, opts)`, `id`, `model`, optional
+  `dimensions`).
+- **Three embeddings adapters**:
+  - `OpenAICompatibleEmbeddingsProvider` (`/v1/embeddings`) — covers OpenAI,
+    Voyage, Mistral, Together, Fireworks, Groq, OpenRouter, plus Azure
+    OpenAI's `api-key` header convention.
+  - `OllamaEmbeddingsProvider` — modern `/api/embed` (batched), with a
+    transparent fallback to legacy `/api/embeddings` (per-text) on 404/405.
+  - `GeminiEmbeddingsProvider` — Google `:batchEmbedContents`, with optional
+    `outputDimensionality` override.
+- **Factory** `buildEmbeddingsProvider({profile, model, dimensions})` —
+  dispatches by `profile.type`, defaulting to OpenAI-compatible for unknown
+  types so self-hosted endpoints "just work".
+- **Chunker** (`core/indexing/chunker.ts`) — symbol-aware chunking for
+  TS/JS/TSX/JSX (one chunk per top-level declaration, tagged with
+  `symbolName`/`symbolKind`), generic sliding-window chunking for everything
+  else, with hard `maxChars` cap.
+- **Vector store** (`core/indexing/vectorStore.ts`) — flat in-memory cosine
+  store with `Float32Array` vectors normalized at insert time, top-k search,
+  per-file removal, and a JSON-on-disk snapshot that refuses to load when
+  provider/model/dimensions don't match.
+- **Semantic index** (`core/indexing/semanticIndex.ts`) — orchestrates
+  walk → chunk → embed → store → save. Reuses unchanged chunks via
+  `contentHash`, drops chunks for files that disappear/become ignored, and
+  honours `AbortSignal`.
+- **Semantic-index holder** (`core/indexing/semanticIndexHolder.ts`) —
+  lifecycle wrapper that lazily resolves the configured embeddings profile,
+  rebuilds the index when relevant settings change, and surfaces a clear
+  "not available" error when the feature is off / misconfigured.
+- **New built-in tools**:
+  - `semantic_search(query, k?, filePattern?)` — embeds the query and
+    returns top-k chunks with `file:lines\tscore` headers and trimmed
+    snippets.
+  - `refresh_semantic_index(force?)` — (re)builds the index on demand.
+  Both return user-actionable errors when the feature is off.
+- **Settings**:
+  - `nexus.enableSemanticIndex` (default `false`) — master switch.
+  - `nexus.embeddingProvider` (default `""` → use `nexus.defaultProvider`).
+  - `nexus.embeddingModel` (default `""`).
+  - `nexus.embeddingDimensions` (optional integer override).
+  - `nexus.embeddingMaxChunkChars` (default `4000`, range 256–32 000).
+- **Settings-change watcher** in `extension.ts` invalidates the holder when
+  any of the embedding-related settings change.
+- **Tool index bridge** (`ToolIndexBridge`) extended with optional
+  `semanticSearch`, `refreshSemantic`, and `semanticStats` hooks. Existing
+  callers continue to work unchanged.
+
+### Tests (+33)
+- `tests/chunker.test.ts` (6) — empty content, sliding-window for non-TS
+  files, symbol-tagged chunks for TS files, oversized symbol splitting,
+  fallback to generic windows when no symbols, `maxChars` invariant.
+- `tests/vectorStore.test.ts` (7) — dimension validation, cosine ranking,
+  top-k ordering, per-id and per-file removal, snapshot round-trip,
+  provider/model/dim mismatch rejection, `hashChunkContent` properties.
+- `tests/embeddingsAdapters.test.ts` (10) — OpenAI request shape,
+  out-of-order index re-sorting, Azure `api-key` header, OpenAI 4xx error
+  surfacing; Ollama batched + legacy fallback + 5xx propagation; Gemini
+  request shape and missing-key guard; `buildEmbeddingsProvider` dispatch.
+- `tests/semanticIndex.test.ts` (5) — multi-file indexing + search,
+  ignore-respecting walk, content-hash chunk reuse, file-removal on next
+  refresh, `filePattern` filter.
+- `tests/semanticTools.test.ts` (5) — graceful fallback when bridge is
+  missing the optional hooks, formatted hit output, empty-result message,
+  `force` flag forwarding for refresh.
+- **Total: 264 → 297 tests passing**.
+
+### Status
+- The semantic index is **opt-in** and **off by default** (`nexus.enableSemanticIndex = false`).
+  The lexical/symbol index continues to do the heavy lifting; semantic search
+  is now wired in as a sibling tool the agent can call when meaning, not
+  tokens, is the right retrieval axis.
+
+## [Unreleased] — Stage 24c housekeeping
 
 ### Added
 - **Persisted current-mode preference.** `core/storage/preferencesStore.ts`

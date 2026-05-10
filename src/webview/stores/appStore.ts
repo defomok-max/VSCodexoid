@@ -24,6 +24,11 @@ const defaultState: AppState = {
     enableMcp: true,
     enableSkills: true,
     enableBrowserTools: false,
+    enableSemanticIndex: false,
+    embeddingProvider: "",
+    embeddingModel: "",
+    embeddingDimensions: undefined,
+    embeddingMaxChunkChars: 4000,
     ui: { theme: "system", compactMode: false, animations: true },
     queue: {
       enabled: true,
