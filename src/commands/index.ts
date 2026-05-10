@@ -1,6 +1,16 @@
 import * as vscode from "vscode";
 import type { NexusWebviewProvider } from "../webview/webviewProvider";
 
+/** Optional dependencies wired up in `extension.ts` after services are ready. */
+export interface CommandDeps {
+  /**
+   * Refresh the workspace index. When provided, the `nexus.indexWorkspace`
+   * command runs an actual refresh and reports the new size; otherwise it
+   * shows a placeholder toast (e.g. when no workspace folder is open).
+   */
+  indexWorkspace?: () => Promise<{ files: number; symbols: number; uniqueTerms: number }>;
+}
+
 /**
  * Registers every `nexus.*` command. Most just route to the sidebar webview;
  * deeper actions (run agent, restore checkpoint, etc) are wired up in later
@@ -9,6 +19,7 @@ import type { NexusWebviewProvider } from "../webview/webviewProvider";
 export function registerCommands(
   context: vscode.ExtensionContext,
   provider: NexusWebviewProvider,
+  deps: CommandDeps = {},
 ): void {
   const reveal = () => provider.reveal();
 
@@ -25,8 +36,34 @@ export function registerCommands(
     ["nexus.manageProviders", reveal],
     ["nexus.manageMcp", reveal],
     ["nexus.manageSkills", reveal],
-    ["nexus.indexWorkspace", () => {
-      provider.postMessage({ type: "toast", level: "info", message: "Workspace indexing scheduled." });
+    ["nexus.indexWorkspace", async () => {
+      if (!deps.indexWorkspace) {
+        provider.postMessage({
+          type: "toast",
+          level: "warn",
+          message: "Workspace indexing requires an open workspace folder.",
+        });
+        return;
+      }
+      provider.postMessage({
+        type: "toast",
+        level: "info",
+        message: "Refreshing workspace index…",
+      });
+      try {
+        const stats = await deps.indexWorkspace();
+        provider.postMessage({
+          type: "toast",
+          level: "info",
+          message: `Indexed ${stats.files} files, ${stats.symbols} symbols, ${stats.uniqueTerms} terms.`,
+        });
+      } catch (e) {
+        provider.postMessage({
+          type: "toast",
+          level: "error",
+          message: `Workspace indexing failed: ${(e as Error).message}`,
+        });
+      }
     }],
     ["nexus.stopAgent", () => {
       provider.postMessage({ type: "toast", level: "warn", message: "Stop requested." });

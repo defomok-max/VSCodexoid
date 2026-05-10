@@ -18,6 +18,7 @@ import type {
   ToolSecurityBridge,
   ToolCheckpointBridge,
   ToolFlowBridge,
+  ToolIndexBridge,
 } from "../tools/toolTypes";
 import type { ToolRegistry } from "../tools/toolRegistry";
 import { evaluateApproval } from "../approval/approvalManager";
@@ -46,6 +47,8 @@ export interface AgentRunDeps {
   security: ToolSecurityBridge;
   checkpoints: ToolCheckpointBridge;
   flow: ToolFlowBridge;
+  /** Optional workspace index; backs `find_symbol` / `lexical_search` / `refresh_index`. */
+  index?: ToolIndexBridge;
   workspaceRoot: string | undefined;
   /** Awaits user decision for an approval request. Resolved by the host. */
   requestApproval: (req: ApprovalRequest) => Promise<ApprovalDecision>;
@@ -211,6 +214,7 @@ export async function* runAgent(opts: AgentRunOptions, deps: AgentRunDeps, abort
         security: deps.security,
         checkpoints: deps.checkpoints,
         flow: deps.flow,
+        index: deps.index,
         taskId: opts.taskId,
       };
       try {

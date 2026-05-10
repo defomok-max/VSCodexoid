@@ -128,6 +128,15 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 17a — Workspace indexing module**
+  - New `src/core/indexing/` module: `WorkspaceIndex` (file metadata + symbol entries + lexical inverted index), `extractSymbols` (regex-based, TS/JS/TSX/JSX/MJS/CJS), `InvertedIndex` (TF·IDF over a Map-of-Maps).
+  - 3 new built-in tools: `find_symbol` (substring or regex match, optional `kind` filter), `lexical_search` (whole-file relevance ranking), `refresh_index` (cheap on warm caches).
+  - `nexus.indexWorkspace` command now actually refreshes the index and reports `files / symbols / unique terms` via toast (instead of the previous placeholder).
+  - `ToolContext.index?: ToolIndexBridge` (optional so tests stay minimal); `AgentRunDeps.index` threads it from `extension.ts` to the agent runner.
+  - All 3 new tools are added to `COMMON_TOOLS`, so every built-in mode (Ask, Architect, Code, Debug, Review, Test, Docs, DevOps, Security) gets them.
+  - Limits: skips ignored paths (`.nexusignore` + safe defaults), 1 MB / file cap, 5000 file cap; binary content is dropped; refreshes coalesce while one is in flight.
+  - +9 vitest tests in `tests/indexing.test.ts` → **188 total**
+
 - [x] **Stage 16 — Write/build tools**
   - 4 new built-in tools (`apply_patch`, `format_files`, `run_test_command`, `install_dependency`); registry 29 → **33**
   - `apply_patch`: structured-hunk apply via `applyHunkMask`, returns `ToolResult.diff` (no direct disk writes); rejects mismatched / overlapping / out-of-range hunks

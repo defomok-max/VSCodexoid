@@ -63,8 +63,45 @@ export interface ToolContext {
    * `summarize_session` (which mutate the active task / queue).
    */
   flow: ToolFlowBridge;
+  /**
+   * Workspace index; backs `find_symbol`, `lexical_search`, and
+   * `refresh_index`. Optional so tests / minimal hosts that don't index can
+   * still construct a context.
+   */
+  index?: ToolIndexBridge;
   /** Identifier of the current task (when invoked from the agent loop). */
   taskId?: string;
+}
+
+export interface ToolIndexBridge {
+  refresh(): Promise<ToolIndexStats>;
+  stats(): ToolIndexStats;
+  findSymbol(
+    name: string,
+    opts?: { kind?: string; regex?: boolean; maxResults?: number },
+  ): ToolSymbolHit[];
+  lexicalSearch(query: string, opts?: { maxResults?: number }): ToolSearchHit[];
+}
+
+export interface ToolIndexStats {
+  files: number;
+  symbols: number;
+  uniqueTerms: number;
+  bytesIndexed: number;
+}
+
+export interface ToolSymbolHit {
+  name: string;
+  kind: string;
+  file: string;
+  line: number;
+  exported: boolean;
+  container?: string;
+}
+
+export interface ToolSearchHit {
+  path: string;
+  score: number;
 }
 
 export interface ToolFlowBridge {
