@@ -5,6 +5,47 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 17b: Native Cohere + HuggingFace adapters
+
+### Added
+- **`CohereProvider`** (`src/core/providers/cohere.ts`) — native adapter for
+  Cohere's `/v2/chat` API. Replaces the previous OpenAI-compatible fallback
+  and supports:
+  - Cohere's content-block message shape (`tool_call_id` for tool results,
+    `tool_calls.function.{name,arguments}` for assistant tool calls).
+  - Streaming `content-delta` / `tool-call-start` / `tool-call-delta` /
+    `message-end` SSE events with usage + finish-reason mapping
+    (`TOOL_CALL` → `tool_calls`, `MAX_TOKENS` → `length`, etc).
+  - `/v1/models?endpoint=chat` listing with a curated fallback when no key
+    is supplied.
+- **`HuggingFaceProvider`** (`src/core/providers/huggingface.ts`) — native
+  adapter for the Hugging Face Inference Router
+  (`POST {baseUrl}/v1/chat/completions`). Defaults to
+  `https://router.huggingface.co`. Supports streaming, tool calls aggregated
+  by `index`, and `usage` reporting.
+- **2 new default provider profiles** in `DEFAULT_PROFILES`:
+  - **Cohere** — `command-a-03-2025` on `https://api.cohere.com`.
+  - **Hugging Face** — `meta-llama/Llama-3.3-70B-Instruct` on
+    `https://router.huggingface.co`.
+
+### Changed
+- `providerRegistry.buildProvider()` now dispatches `cohere` to
+  `CohereProvider` and `huggingface` to `HuggingFaceProvider`. The OpenAI-
+  compatible fallback is no longer used for these two types.
+
+### Tests
+- 9 new vitest cases in `tests/cohereHuggingface.test.ts`:
+  - `buildProvider` instance routing for both adapters.
+  - Cohere: fallback model list when no key, `/v2/chat` non-streaming with
+    tool calls + usage, tool-result message translation (`role: "tool"`,
+    `tool_call_id`), full SSE event flow including
+    `content-delta` / `tool-call-start` / `tool-call-delta` / `message-end`.
+  - Hugging Face: `/v1/chat/completions` non-streaming, `/v1/models` with
+    fallback on empty list, full streaming flow with text deltas,
+    tool-call aggregation by `index`, usage, and finish reason.
+
+**Total: 188 → 197 tests passing.**
+
 ## [Unreleased] — Stage 17a: Workspace indexing module
 
 ### Added
