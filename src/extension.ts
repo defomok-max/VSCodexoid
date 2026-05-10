@@ -15,6 +15,7 @@ import { registerBuiltinTools } from "./core/tools/builtin";
 import { IgnoreMatcher, SAFE_DEFAULT_IGNORES } from "./core/security/ignoreMatcher";
 import { scanSecrets } from "./core/security/secretScanner";
 import { resolveWorkspacePath } from "./core/security/pathGuard";
+import { isAllowedWebviewCommand } from "./core/security/commandAllowlist";
 import { SkillRegistry } from "./core/skills/skillRegistry";
 import { BUILT_IN_SKILLS } from "./core/skills/builtInSkills";
 import { loadProjectSkills } from "./core/skills/skillLoader";
@@ -436,6 +437,30 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
       const popped = deps.runnerDeps.queueManager.sendNow(msg.itemId, msg.behavior);
       if (popped) {
         await startTask(popped.item.text, popped.item.modeOverride, popped.item.providerOverride, popped.item.modelOverride, deps, popped.item.attachments);
+      }
+      return;
+    }
+    case "command/run": {
+      // The webview cannot call `executeCommand` directly. We forward only
+      // commands on a small, deliberate allowlist (see
+      // `core/security/commandAllowlist.ts`).
+      if (!isAllowedWebviewCommand(msg.command)) {
+        logger.warn(`webview attempted to run disallowed command: ${msg.command}`);
+        post({
+          type: "toast",
+          level: "error",
+          message: `Command "${msg.command}" is not allowed from the sidebar.`,
+        });
+        return;
+      }
+      try {
+        await vscode.commands.executeCommand(msg.command);
+      } catch (e) {
+        post({
+          type: "toast",
+          level: "error",
+          message: `Command "${msg.command}" failed: ${(e as Error).message}`,
+        });
       }
       return;
     }

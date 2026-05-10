@@ -19,12 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Code marks the workspace untrusted. `AppState.workspaceTrusted` lets the
   webview surface the state.
 - **6 new vitest tests** in `tests/workspaceTrust.test.ts`.
+- **Workspace-trust UI banner.** `TrustBanner` appears when the workspace is
+  untrusted and opens VS Code's trust dialog through an allowlisted
+  `command/run` host bridge.
+- **Command allowlist** for webview-initiated VS Code commands:
+  `workbench.trust.manage`, `workbench.action.openSettings`, and
+  `workbench.action.reloadWindow`.
+- **5 new vitest tests** in `tests/commandAllowlist.test.ts`.
 
 ### Notes
 - Mode preference intentionally stays out of `nexus.*` settings, avoiding
   workspace settings churn for a per-user UI choice.
 - In untrusted workspaces, shell/edit/git/network/checkpoint tools are hidden
   from the LLM before tool descriptors are sent.
+- The webview cannot run arbitrary VS Code commands; `command/run` is scoped to
+  the explicit allowlist above.
 
 ## [0.1.0+stage18] — Stage 18: Queue persistence
 
