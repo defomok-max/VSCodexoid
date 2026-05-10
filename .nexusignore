@@ -1,0 +1,17 @@
+# Paths the agent must never read, embed, or send to the model.
+node_modules/
+dist/
+out/
+.git/
+.vscode-test/
+coverage/
+*.lock
+pnpm-lock.yaml
+package-lock.json
+*.env
+.env.*
+.secrets/
+*.pem
+*.key
+*.p12
+*.pfx

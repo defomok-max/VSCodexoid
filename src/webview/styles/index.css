@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nexus-bg: #ffffff;
+  --nexus-surface: #fafaf9;
+  --nexus-surface-2: #f4f4f3;
+  --nexus-border: #e7e5e4;
+  --nexus-text: #1c1917;
+  --nexus-muted: #78716c;
+  --nexus-accent: #c2410c;
+  --nexus-accent-hover: #9a3412;
+  --nexus-danger: #b91c1c;
+  --nexus-warn: #b45309;
+  --nexus-ok: #15803d;
+}
+
+.dark {
+  --nexus-bg: #0c0a09;
+  --nexus-surface: #1c1917;
+  --nexus-surface-2: #292524;
+  --nexus-border: #292524;
+  --nexus-text: #f5f5f4;
+  --nexus-muted: #a8a29e;
+  --nexus-accent: #f97316;
+  --nexus-accent-hover: #fb923c;
+  --nexus-danger: #ef4444;
+  --nexus-warn: #f59e0b;
+  --nexus-ok: #22c55e;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--nexus-bg);
+  color: var(--nexus-text);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--nexus-surface-2); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--nexus-border); }
+
+@layer components {
+  .nx-card {
+    @apply bg-nexus-surface border border-nexus-border rounded-2xl shadow-soft;
+  }
+  .nx-btn {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl border text-[13px] font-medium transition-colors;
+  }
+  .nx-btn-primary {
+    background: var(--nexus-accent);
+    color: white;
+    border-color: transparent;
+  }
+  .nx-btn-primary:hover { background: var(--nexus-accent-hover); }
+  .nx-btn-ghost {
+    @apply bg-transparent border-transparent text-nexus-muted hover:text-nexus-text;
+  }
+  .nx-btn-soft {
+    @apply bg-nexus-surface-2 border-nexus-border text-nexus-text hover:bg-nexus-border;
+  }
+  .nx-input {
+    @apply w-full bg-nexus-surface border border-nexus-border rounded-xl px-3 py-2 text-nexus-text placeholder-nexus-muted outline-none focus:ring-2 focus:ring-nexus-accent;
+  }
+  .nx-tag {
+    @apply inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-nexus-surface-2 border border-nexus-border text-nexus-muted;
+  }
+  .nx-divider {
+    @apply h-px w-full bg-nexus-border;
+  }
+}
+
+.markdown :where(pre) {
+  background: var(--nexus-surface-2);
+  border: 1px solid var(--nexus-border);
+  border-radius: 12px;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+}
+.markdown :where(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+}
+.markdown :where(p) { margin: 0.4em 0; }
+.markdown :where(h1, h2, h3) { font-weight: 600; margin: 0.6em 0 0.3em; }
+.markdown :where(ul) { padding-left: 1.2em; list-style: disc; }
+.markdown :where(ol) { padding-left: 1.4em; list-style: decimal; }
+.markdown :where(a) { color: var(--nexus-accent); text-decoration: underline; }

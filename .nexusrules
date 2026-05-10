@@ -1,0 +1,10 @@
+# NexusCode rules — natural-language constraints injected into the agent's system prompt.
+# Lines starting with '#' are comments. Add or edit freely.
+
+- Always use TypeScript strict mode.
+- Do not introduce new dependencies without approval.
+- Prefer small, focused changes; avoid drive-by refactors.
+- Always update tests when behavior changes.
+- Never edit generated files.
+- Preserve existing code style and import order.
+- Do not expose secrets or write them to disk or stdout.

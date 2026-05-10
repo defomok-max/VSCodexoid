@@ -1,0 +1,168 @@
+{
+  "name": "nexuscode-agent",
+  "displayName": "NexusCode Agent",
+  "description": "An open-source agentic AI coding environment for VS Code with multi-provider support, Skills, MCP, message queue, approvals, checkpoints, and a Claude-like UI.",
+  "version": "0.1.0",
+  "publisher": "nexuscode",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/defomok-max/VSCodexoid.git"
+  },
+  "homepage": "https://github.com/defomok-max/VSCodexoid",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18.0.0"
+  },
+  "categories": ["AI", "Chat", "Programming Languages", "Other"],
+  "keywords": [
+    "ai",
+    "agent",
+    "copilot",
+    "cline",
+    "roo",
+    "codex",
+    "claude",
+    "openai",
+    "anthropic",
+    "gemini",
+    "ollama",
+    "mcp",
+    "skills"
+  ],
+  "main": "./dist/extension.js",
+  "icon": "media/icon.png",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nexuscode-sidebar",
+          "title": "NexusCode",
+          "icon": "media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "nexuscode-sidebar": [
+        {
+          "id": "nexuscode.chat",
+          "name": "Agent",
+          "type": "webview",
+          "icon": "media/sidebar-icon.svg",
+          "contextualTitle": "NexusCode Agent"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "nexus.openChat", "title": "NexusCode: Open Chat", "category": "NexusCode" },
+      { "command": "nexus.newTask", "title": "NexusCode: New Task", "category": "NexusCode" },
+      { "command": "nexus.explainSelection", "title": "NexusCode: Explain Selection", "category": "NexusCode" },
+      { "command": "nexus.fixSelection", "title": "NexusCode: Fix Selection", "category": "NexusCode" },
+      { "command": "nexus.generateTests", "title": "NexusCode: Generate Tests", "category": "NexusCode" },
+      { "command": "nexus.reviewDiff", "title": "NexusCode: Review Git Diff", "category": "NexusCode" },
+      { "command": "nexus.debugError", "title": "NexusCode: Debug Error", "category": "NexusCode" },
+      { "command": "nexus.indexWorkspace", "title": "NexusCode: Index Workspace", "category": "NexusCode" },
+      { "command": "nexus.openSettings", "title": "NexusCode: Open Settings", "category": "NexusCode" },
+      { "command": "nexus.manageProviders", "title": "NexusCode: Manage Providers", "category": "NexusCode" },
+      { "command": "nexus.manageMcp", "title": "NexusCode: Manage MCP Servers", "category": "NexusCode" },
+      { "command": "nexus.manageSkills", "title": "NexusCode: Manage Skills", "category": "NexusCode" },
+      { "command": "nexus.createCheckpoint", "title": "NexusCode: Create Checkpoint", "category": "NexusCode" },
+      { "command": "nexus.restoreCheckpoint", "title": "NexusCode: Restore Checkpoint", "category": "NexusCode" },
+      { "command": "nexus.clearSession", "title": "NexusCode: Clear Session", "category": "NexusCode" },
+      { "command": "nexus.resumeSession", "title": "NexusCode: Resume Session", "category": "NexusCode" },
+      { "command": "nexus.forkSession", "title": "NexusCode: Fork Session", "category": "NexusCode" },
+      { "command": "nexus.stopAgent", "title": "NexusCode: Stop Agent", "category": "NexusCode" },
+      { "command": "nexus.toggleAutoApprove", "title": "NexusCode: Toggle Auto-Approve", "category": "NexusCode" },
+      { "command": "nexus.queueMessage", "title": "NexusCode: Queue Message", "category": "NexusCode" },
+      { "command": "nexus.clearQueue", "title": "NexusCode: Clear Queue", "category": "NexusCode" },
+      { "command": "nexus.pauseQueue", "title": "NexusCode: Pause Queue", "category": "NexusCode" },
+      { "command": "nexus.resumeQueue", "title": "NexusCode: Resume Queue", "category": "NexusCode" },
+      { "command": "nexus.sendQueuedNow", "title": "NexusCode: Send Queued Message Now", "category": "NexusCode" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "nexus.explainSelection", "group": "nexuscode@1", "when": "editorHasSelection" },
+        { "command": "nexus.fixSelection", "group": "nexuscode@2", "when": "editorHasSelection" },
+        { "command": "nexus.generateTests", "group": "nexuscode@3" }
+      ],
+      "editor/title": [
+        { "command": "nexus.openChat", "group": "navigation", "when": "resourceScheme == file" }
+      ],
+      "view/title": [
+        { "command": "nexus.newTask", "group": "navigation@1", "when": "view == nexuscode.chat" },
+        { "command": "nexus.openSettings", "group": "navigation@2", "when": "view == nexuscode.chat" },
+        { "command": "nexus.stopAgent", "group": "navigation@3", "when": "view == nexuscode.chat" }
+      ]
+    },
+    "configuration": {
+      "title": "NexusCode",
+      "properties": {
+        "nexus.defaultProvider": { "type": "string", "default": "openai-compatible", "description": "Default provider profile id." },
+        "nexus.defaultModel": { "type": "string", "default": "gpt-4o-mini", "description": "Default model id." },
+        "nexus.reasoningEffort": { "type": "string", "enum": ["low", "medium", "high", "extreme"], "default": "medium" },
+        "nexus.approvalPolicy": { "type": "string", "enum": ["manual", "balanced", "auto-safe", "full-auto"], "default": "balanced" },
+        "nexus.autoApproveReadOnly": { "type": "boolean", "default": true },
+        "nexus.autoApproveWorkspaceEdits": { "type": "boolean", "default": false },
+        "nexus.maxContextTokens": { "type": "number", "default": 120000 },
+        "nexus.maxCommandRuntimeMs": { "type": "number", "default": 120000 },
+        "nexus.enableMcp": { "type": "boolean", "default": true },
+        "nexus.enableSkills": { "type": "boolean", "default": true },
+        "nexus.enableBrowserTools": { "type": "boolean", "default": false },
+        "nexus.enableTelemetry": { "type": "boolean", "default": false },
+        "nexus.enableSemanticIndex": { "type": "boolean", "default": false },
+        "nexus.embeddingProvider": { "type": "string", "default": "" },
+        "nexus.ignorePatterns": { "type": "array", "items": { "type": "string" }, "default": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**", "**/*.lock", "**/pnpm-lock.yaml", "**/package-lock.json"] },
+        "nexus.customInstructions": { "type": "string", "default": "" },
+        "nexus.rulesFile": { "type": "string", "default": ".nexusrules" },
+        "nexus.checkpoints.enabled": { "type": "boolean", "default": true },
+        "nexus.checkpoints.maxCount": { "type": "number", "default": 50 },
+        "nexus.queue.enabled": { "type": "boolean", "default": true },
+        "nexus.queue.autoSendNext": { "type": "boolean", "default": true },
+        "nexus.queue.allowInterrupt": { "type": "boolean", "default": true },
+        "nexus.queue.preserveContext": { "type": "boolean", "default": true },
+        "nexus.queue.summarizePreviousRun": { "type": "boolean", "default": true },
+        "nexus.ui.theme": { "type": "string", "enum": ["light", "dark", "system"], "default": "system" },
+        "nexus.ui.compactMode": { "type": "boolean", "default": false },
+        "nexus.ui.animations": { "type": "boolean", "default": true }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs --production",
+    "build:dev": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx --max-warnings=0",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "pnpm run build"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.3",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
+    "@vscode/vsce": "^2.31.0",
+    "autoprefixer": "^10.4.19",
+    "esbuild": "^0.23.0",
+    "eslint": "^8.57.0",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "diff": "^5.2.0",
+    "framer-motion": "^11.3.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.4"
+  }
+}

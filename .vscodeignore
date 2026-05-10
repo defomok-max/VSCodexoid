@@ -1,0 +1,16 @@
+.vscode/**
+src/**
+tests/**
+node_modules/**
+**/*.map
+**/*.ts
+**/*.tsx
+.gitignore
+.eslintrc*
+tsconfig*.json
+esbuild.config.mjs
+tailwind.config.cjs
+postcss.config.cjs
+vitest.config.ts
+docs/**
+.nexus/**

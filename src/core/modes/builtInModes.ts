@@ -1,0 +1,172 @@
+import type { ModeProfile } from "../../shared/types";
+
+const COMMON_TOOLS = [
+  "read_file",
+  "list_files",
+  "search_files",
+  "grep",
+  "get_symbols",
+  "get_diagnostics",
+  "get_open_files",
+  "get_selection",
+  "get_terminal_output",
+  "get_git_status",
+  "get_git_diff",
+  "ask_user",
+  "show_diff",
+  "update_todo_list",
+  "queue_message",
+  "summarize_session",
+];
+
+const EDIT_TOOLS = [
+  ...COMMON_TOOLS,
+  "write_file",
+  "edit_file",
+  "create_file",
+  "delete_file",
+  "rename_file",
+  "apply_patch",
+  "format_files",
+  "create_checkpoint",
+  "restore_checkpoint",
+  "rollback_checkpoint",
+];
+
+const SHELL_TOOLS = [...EDIT_TOOLS, "run_terminal_command", "run_test_command", "install_dependency"];
+
+const GIT_TOOLS = [
+  ...COMMON_TOOLS,
+  "create_git_branch",
+  "stage_files",
+  "commit_changes",
+];
+
+export const builtInModes: ModeProfile[] = [
+  {
+    id: "ask",
+    name: "Ask",
+    description: "Read-only Q&A. Cannot modify files or run commands without explicit approval.",
+    systemPrompt:
+      "You are a careful read-only coding assistant. Inspect files, answer questions, and never modify the workspace.",
+    allowedTools: COMMON_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: [],
+    reasoningEffort: "medium",
+    approvalPolicy: "manual",
+    riskTolerance: "low",
+    builtIn: true,
+  },
+  {
+    id: "architect",
+    name: "Architect",
+    description: "Design specs, ADRs, migration plans. Does not edit code by default.",
+    systemPrompt:
+      "You are an architecture assistant. Produce focused specs, ADRs, and migration plans. Only create plan.md or design docs after approval.",
+    allowedTools: [...COMMON_TOOLS, "create_file"],
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "high",
+    approvalPolicy: "balanced",
+    riskTolerance: "low",
+    builtIn: true,
+  },
+  {
+    id: "code",
+    name: "Code",
+    description: "Primary development mode: read, edit, and create files; run tests after approval.",
+    systemPrompt:
+      "You are an expert software engineer. Always inspect before editing, prefer minimal diffs, and run validations when relevant.",
+    allowedTools: SHELL_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "medium",
+    approvalPolicy: "balanced",
+    riskTolerance: "medium",
+    builtIn: true,
+  },
+  {
+    id: "debug",
+    name: "Debug",
+    description: "Analyze errors, logs, and diagnostics; propose root cause and fix.",
+    systemPrompt:
+      "You are a debugging assistant. Read logs, terminal output, and diagnostics. Propose minimal targeted fixes; only add temporary debug logs after approval.",
+    allowedTools: SHELL_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "high",
+    approvalPolicy: "balanced",
+    riskTolerance: "medium",
+    builtIn: true,
+  },
+  {
+    id: "review",
+    name: "Review",
+    description: "PR-style review of staged or branch changes — bugs, edge cases, security.",
+    systemPrompt:
+      "You are a senior code reviewer. Read git diff, find bugs/edge cases/security issues, and write concise, actionable review comments.",
+    allowedTools: [...COMMON_TOOLS, ...GIT_TOOLS],
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "high",
+    approvalPolicy: "balanced",
+    riskTolerance: "low",
+    builtIn: true,
+  },
+  {
+    id: "test",
+    name: "Test",
+    description: "Generate unit/integration/e2e tests, run them, analyze coverage.",
+    systemPrompt:
+      "You are a test author. Generate focused tests that follow the project's existing style. Run tests and report failures.",
+    allowedTools: SHELL_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "medium",
+    approvalPolicy: "balanced",
+    riskTolerance: "medium",
+    builtIn: true,
+  },
+  {
+    id: "docs",
+    name: "Docs",
+    description: "Write README, API docs, comments, changelog while preserving project style.",
+    systemPrompt:
+      "You write clear, concise documentation that matches the project's voice and structure.",
+    allowedTools: EDIT_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "medium",
+    approvalPolicy: "balanced",
+    riskTolerance: "low",
+    builtIn: true,
+  },
+  {
+    id: "devops",
+    name: "DevOps",
+    description: "Docker, CI, GitHub Actions, deployment configs. All commands are high-risk.",
+    systemPrompt:
+      "You are a DevOps assistant. Treat every command as high-risk; never deploy or push without explicit approval.",
+    allowedTools: SHELL_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: "*",
+    reasoningEffort: "high",
+    approvalPolicy: "manual",
+    riskTolerance: "high",
+    builtIn: true,
+  },
+  {
+    id: "security",
+    name: "Security",
+    description: "Scan for secrets, dependency risks, and insecure patterns. Produces a report.",
+    systemPrompt:
+      "You are a security auditor. Detect secrets, insecure patterns, and risky dependencies. Never include secret values in your output.",
+    allowedTools: COMMON_TOOLS,
+    allowedSkills: "*",
+    allowedMcpServers: [],
+    reasoningEffort: "high",
+    approvalPolicy: "manual",
+    riskTolerance: "low",
+    builtIn: true,
+  },
+];

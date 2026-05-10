@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src ${cspSource} https: data:; script-src 'nonce-${nonce}'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource} https: data:; connect-src https: http: ws: wss:;" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusCode</title>
+    <link rel="stylesheet" href="${cssUri}" />
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full"></div>
+    <script nonce="${nonce}" src="${jsUri}"></script>
+  </body>
+</html>
