@@ -1,5 +1,21 @@
 import type { McpServerConfig, McpToolDescriptor } from "../../shared/types";
 import { McpStdioClient } from "./mcpClient";
+import { McpHttpClient } from "./mcpHttpClient";
+import type { McpInitializeResult, McpToolCallResult, McpToolsListResult } from "./mcpProtocol";
+
+/**
+ * Common surface implemented by both `McpStdioClient` and `McpHttpClient` so
+ * the manager can hold either kind in a single map.
+ */
+export interface McpClient {
+  readonly serverId: string;
+  isRunning(): boolean;
+  uptimeMs(): number;
+  start(timeoutMs?: number): Promise<McpInitializeResult>;
+  listTools(): Promise<McpToolsListResult>;
+  callTool(name: string, args: unknown, timeoutMs?: number): Promise<McpToolCallResult>;
+  stop(): Promise<void>;
+}
 
 export interface McpManagerEvents {
   tools: (descriptors: McpToolDescriptor[]) => void;
@@ -12,7 +28,7 @@ export interface McpManagerEvents {
  * for additional tools beyond the built-ins.
  */
 export class McpManager {
-  private clients = new Map<string, McpStdioClient>();
+  private clients = new Map<string, McpClient>();
   private toolsByServer = new Map<string, McpToolDescriptor[]>();
   private listeners: Partial<McpManagerEvents> = {};
 
@@ -21,19 +37,10 @@ export class McpManager {
   }
 
   async startServer(cfg: McpServerConfig): Promise<void> {
-    if (cfg.type !== "stdio") {
-      // HTTP/SSE transports not implemented yet — surface a status update so
-      // the UI can show a friendly message.
-      this.listeners.status?.(cfg.id, "error", `transport "${cfg.type}" not yet implemented`);
-      return;
-    }
-    if (!cfg.command) {
-      this.listeners.status?.(cfg.id, "error", "stdio server missing command");
-      return;
-    }
     if (this.clients.has(cfg.id)) await this.stopServer(cfg.id);
 
-    const client = new McpStdioClient(cfg.id, cfg.command, cfg.args ?? [], cfg.env ?? {});
+    const client = this.createClient(cfg);
+    if (!client) return;
     this.clients.set(cfg.id, client);
     this.listeners.status?.(cfg.id, "starting");
     try {
@@ -85,7 +92,30 @@ export class McpManager {
     return out;
   }
 
-  getClient(serverId: string): McpStdioClient | undefined {
+  getClient(serverId: string): McpClient | undefined {
     return this.clients.get(serverId);
+  }
+
+  private createClient(cfg: McpServerConfig): McpClient | null {
+    if (cfg.type === "stdio") {
+      if (!cfg.command) {
+        this.listeners.status?.(cfg.id, "error", "stdio server missing command");
+        return null;
+      }
+      return new McpStdioClient(cfg.id, cfg.command, cfg.args ?? [], cfg.env ?? {});
+    }
+    if (cfg.type === "http" || cfg.type === "sse") {
+      if (!cfg.url) {
+        this.listeners.status?.(cfg.id, "error", `${cfg.type} server missing url`);
+        return null;
+      }
+      return new McpHttpClient(cfg.id, {
+        transport: cfg.type,
+        url: cfg.url,
+        headers: cfg.headers,
+      });
+    }
+    this.listeners.status?.(cfg.id, "error", `unknown MCP transport "${cfg.type as string}"`);
+    return null;
   }
 }

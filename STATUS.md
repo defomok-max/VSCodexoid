@@ -110,7 +110,13 @@ The final PR target is `dev → main`.
   - Node 20 + pnpm 9 + ubuntu-latest, 10-minute timeout
   - `CHANGELOG.md` and `docs/CONTRIBUTING.md` updated to reference CI
 
-- [ ] **Final** — open `dev → main` PR with full summary, screenshots, and how-to-test
+- [x] **Stage 9 — HTTP/SSE MCP transport**
+  - `McpHttpClient` covers Streamable HTTP (spec 2025-03-26) and legacy HTTP+SSE (spec 2024-11-05)
+  - `McpClient` interface unifies stdio and HTTP clients in `McpManager`
+  - +5 vitest tests → **110 total**; previous `transport "<x>" not yet implemented` error gone
+  - `docs/ARCHITECTURE.md` §11 rewritten to describe all three transports
+
+- [x] **Final** — `dev → main` PR merged at `522ad3f` (Stages 1–8). Stage 9+ ship via individual PRs against `main`.
 
 ---
 

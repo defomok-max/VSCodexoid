@@ -5,7 +5,31 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 8: CI
+## [Unreleased] — Stage 9: HTTP/SSE MCP transport
+
+### Added
+- `McpHttpClient` (`src/core/mcp/mcpHttpClient.ts`) — implements the MCP
+  **Streamable HTTP** transport (spec 2025-03-26: single POST endpoint,
+  responses can be JSON or `text/event-stream`, `Mcp-Session-Id` propagation)
+  and the legacy **HTTP+SSE** transport (spec 2024-11-05: long-lived GET for
+  SSE, `event: endpoint` announces the POST URL, `event: message` carries
+  JSON-RPC frames). Uses Node 18 native `fetch` and `ReadableStream` — no
+  extra runtime dependencies.
+- `McpClient` interface (`src/core/mcp/mcpManager.ts`) — common surface for
+  stdio and HTTP clients (`start`, `listTools`, `callTool`, `stop`, etc.).
+- 5 new vitest tests covering HTTP initialize handshake, JSON ↔ SSE response
+  switching, `Mcp-Session-Id` header propagation, non-2xx error surfacing,
+  and `McpManager` config validation for `http`/`sse` types missing `url`.
+  Total: **110 tests** passing.
+
+### Changed
+- `McpManager.startServer` now dispatches to the right client based on
+  `cfg.type` (`stdio` → `McpStdioClient`, `http`/`sse` → `McpHttpClient`).
+  The previous `transport "<x>" not yet implemented` error is gone.
+- `docs/ARCHITECTURE.md` §11 (MCP) rewritten to describe all three
+  transports and the `McpClient` interface contract.
+
+## [0.1.0] — Stage 8: CI
 
 ### Added
 - `.github/workflows/ci.yml` — GitHub Actions pipeline running on every push
