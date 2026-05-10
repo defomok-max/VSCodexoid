@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { buildToolUiBridge } from "./core/tools/uiBridgeAdapter";
 import { NexusWebviewProvider } from "./webview/webviewProvider";
 import { SettingsStore } from "./core/storage/settingsStore";
 import { SessionStore } from "./core/storage/sessionStore";
@@ -409,15 +410,10 @@ async function startTask(
       },
       {
         toolRegistry: runnerDeps.toolRegistry,
-        ui: {
-          showInfo: (m) => post({ type: "toast", level: "info", message: m }),
-          showWarning: (m) => post({ type: "toast", level: "warn", message: m }),
-          showError: (m) => post({ type: "toast", level: "error", message: m }),
-          getSelection: async () => undefined,
-          getOpenFiles: async () =>
-            vscode.workspace.textDocuments.map((d) => d.uri.fsPath),
-          askUser: async (q: string) => await vscode.window.showInputBox({ prompt: q }),
-        },
+        ui: buildToolUiBridge({
+          post,
+          showInputBox: (q) => vscode.window.showInputBox({ prompt: q }),
+        }),
         security,
         workspaceRoot: runnerDeps.workspaceRoot,
         requestApproval: (req) => runnerDeps.approvalGate.request(req),

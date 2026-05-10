@@ -66,7 +66,7 @@ src/
 │   ├─ security/              — IgnoreMatcher, secretScanner, pathGuard
 │   ├─ skills/                — registry, loader, 20 built-in skills
 │   ├─ storage/               — settings (workspace.config) + recent tasks
-│   ├─ tools/                 — ToolRegistry + 15 built-in tools
+│   ├─ tools/                 — ToolRegistry + 20 built-in tools
 │   └─ util/                  — id, logger
 └─ webview/
     ├─ App.tsx                — TopBar / Sidebar / view switcher / ApprovalDialog
@@ -240,22 +240,33 @@ ToolDefinition<I> = {
 }
 ```
 
-15 built-in tools registered in `core/tools/builtin/index.ts`:
+20 built-in tools registered in `core/tools/builtin/index.ts`:
 
-| Category   | Tools |
-|------------|-------|
-| read       | `read_file`, `list_files` |
-| search     | `search_files`, `grep` |
-| edit       | `write_file`, `edit_file`, `create_file`, `delete_file`, `rename_file` |
-| shell      | `run_terminal_command` (dynamic risk via `assessCommandRisk`) |
-| git        | `get_git_status`, `get_git_diff`, `create_git_branch`, `stage_files`, `commit_changes` |
+| Category    | Tools |
+|-------------|-------|
+| read        | `read_file`, `list_files`, `get_open_files`, `get_selection`, `get_symbols`, `get_terminal_output` |
+| search      | `search_files`, `grep` |
+| diagnostics | `get_diagnostics` |
+| edit        | `write_file`, `edit_file`, `create_file`, `delete_file`, `rename_file` |
+| shell       | `run_terminal_command` (dynamic risk via `assessCommandRisk`) |
+| git         | `get_git_status`, `get_git_diff`, `create_git_branch`, `stage_files`, `commit_changes` |
 
 Tool execution is sandboxed by `ToolContext`:
 
 - `signal`: the agent's `AbortSignal` — every external call must propagate it.
-- `ui`: VS Code helpers (showInfo/Warning/Error, getSelection, getOpenFiles, askUser).
+- `ui`: VS Code helpers (showInfo/Warning/Error, getSelection, getOpenFiles,
+  getDiagnostics, getSymbols, askUser). The host adapter
+  (`core/tools/uiBridgeAdapter.ts`) wraps `vscode.window.activeTextEditor`,
+  `vscode.languages.getDiagnostics`, and the
+  `vscode.executeDocumentSymbolProvider` command.
 - `security`: `isIgnored(path)`, `resolveWorkspacePath(path)` (traversal guard),
   `scanSecrets(content)` (returns redacted copy + matches).
+
+The `get_terminal_output` tool reads from a small in-memory ring buffer in
+`core/tools/builtin/terminalCapture.ts` that `run_terminal_command` writes to
+after every invocation. This lets the agent inspect output from a previous
+step without re-running the command (and without exposing the buffer to other
+processes).
 
 Edits never write to disk directly. `write_file`/`edit_file` build a
 `DiffPreview` via `patchEngine.buildDiffPreview` and return it in
@@ -493,7 +504,7 @@ scaffold          smoke
 
 1. Build stores: `SettingsStore`, `ProviderProfileStore` (`globalState`),
    `ProviderSecretStore` (`secretStorage`), `ProviderRegistry`.
-2. Build `ToolRegistry`, register the 15 built-in tools.
+2. Build `ToolRegistry`, register the 20 built-in tools.
 3. Build `SkillRegistry`, register the 20 built-in skills, then load any
    project skills from `<workspace>/.nexus/skills`.
 4. Build `McpManager` and wire its `tools`/`status` listeners to webview

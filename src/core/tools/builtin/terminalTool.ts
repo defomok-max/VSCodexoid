@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { z } from "zod";
 import { assessCommandRisk } from "../../approval/approvalManager";
 import type { ToolDefinition } from "../toolTypes";
+import { recordTerminalOutput } from "./terminalCapture";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT = 64 * 1024;
@@ -70,6 +71,15 @@ export const runTerminalCommandTool: ToolDefinition<{
         cleanup();
         const { redacted: outRed } = ctx.security.scanSecrets(stdout);
         const { redacted: errRed } = ctx.security.scanSecrets(stderr);
+        recordTerminalOutput({
+          command: args.command,
+          cwd,
+          stdout: outRed,
+          stderr: errRed,
+          exitCode: code,
+          signal,
+          ts: Date.now(),
+        });
         const summary =
           (outRed ? `stdout:\n${outRed}\n` : "") +
           (errRed ? `stderr:\n${errRed}\n` : "") +
