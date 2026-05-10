@@ -17,6 +17,13 @@ import {
   gitStageTool,
   gitStatusTool,
 } from "./gitTools";
+import {
+  getDiagnosticsTool,
+  getOpenFilesTool,
+  getSelectionTool,
+  getSymbolsTool,
+  getTerminalOutputTool,
+} from "./workspaceTools";
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(readFileTool);
@@ -37,6 +44,12 @@ export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(gitCreateBranchTool);
   reg.register(gitStageTool);
   reg.register(gitCommitTool);
+
+  reg.register(getOpenFilesTool);
+  reg.register(getSelectionTool);
+  reg.register(getDiagnosticsTool);
+  reg.register(getSymbolsTool);
+  reg.register(getTerminalOutputTool);
 }
 
 export const BUILTIN_TOOL_IDS = [
@@ -55,4 +68,9 @@ export const BUILTIN_TOOL_IDS = [
   "create_git_branch",
   "stage_files",
   "commit_changes",
+  "get_open_files",
+  "get_selection",
+  "get_diagnostics",
+  "get_symbols",
+  "get_terminal_output",
 ];

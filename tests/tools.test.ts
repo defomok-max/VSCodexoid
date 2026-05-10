@@ -22,6 +22,8 @@ function buildCtx(root: string): ToolContext {
       showError: () => undefined,
       getSelection: async () => undefined,
       getOpenFiles: async () => [],
+      getDiagnostics: async () => [],
+      getSymbols: async () => [],
       askUser: async () => undefined,
     },
     security: {

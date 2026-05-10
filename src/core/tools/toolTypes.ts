@@ -60,13 +60,64 @@ export interface ToolUiBridge {
   showWarning(msg: string): void;
   showError(msg: string): void;
   /** Get the active editor selection, if any. */
-  getSelection(): Promise<{ file: string; selection?: { start: { line: number; column: number }; end: { line: number; column: number } } } | undefined>;
+  getSelection(): Promise<EditorSelectionInfo | undefined>;
   getOpenFiles(): Promise<string[]>;
+  /**
+   * Returns diagnostics (problems) for the workspace. If `filePath` is given,
+   * only diagnostics for that file are returned; otherwise diagnostics for
+   * every file with at least one entry are returned.
+   */
+  getDiagnostics(filePath?: string): Promise<FileDiagnostics[]>;
+  /**
+   * Returns the document symbol tree for the given file (resolved via the
+   * editor's language service). The path is workspace-relative or absolute.
+   */
+  getSymbols(filePath: string): Promise<SymbolInfo[]>;
   /**
    * Ask the user a free-form question. Resolves with the answer or `undefined`
    * if the user dismissed the prompt.
    */
   askUser(question: string): Promise<string | undefined>;
+}
+
+export interface EditorSelectionInfo {
+  file: string;
+  selection?: {
+    start: { line: number; column: number };
+    end: { line: number; column: number };
+  };
+  /** Selected text (UTF-8). May be empty if no characters are selected. */
+  text?: string;
+}
+
+export interface FileDiagnostics {
+  /** Workspace-relative or absolute path. */
+  file: string;
+  items: DiagnosticInfo[];
+}
+
+export interface DiagnosticInfo {
+  severity: "error" | "warning" | "info" | "hint";
+  message: string;
+  /** 1-based line number. */
+  line: number;
+  /** 1-based column number. */
+  column: number;
+  source?: string;
+  code?: string;
+}
+
+export interface SymbolInfo {
+  name: string;
+  kind: string;
+  /** 1-based line number where the symbol starts. */
+  line: number;
+  /** 1-based column number where the symbol starts. */
+  column: number;
+  /** Container symbol name (class / namespace), if any. */
+  container?: string;
+  detail?: string;
+  children?: SymbolInfo[];
 }
 
 export interface ToolSecurityBridge {

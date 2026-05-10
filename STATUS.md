@@ -128,6 +128,13 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 12 — Workspace inspection tools**
+  - 5 new built-in tools (`get_open_files`, `get_selection`, `get_diagnostics`, `get_symbols`, `get_terminal_output`) — all `safe` read-only; modes' `COMMON_TOOLS` set is now fully registered (registry grows from 15 → 20)
+  - `core/tools/uiBridgeAdapter.ts` — host-side glue wiring `vscode.window.activeTextEditor`, `vscode.languages.getDiagnostics`, and `vscode.executeDocumentSymbolProvider` into the abstract `ToolUiBridge`
+  - `core/tools/builtin/terminalCapture.ts` — 16-entry ring buffer of redacted `run_terminal_command` snapshots; `get_terminal_output` reads from it
+  - `ToolUiBridge` interface gains `getDiagnostics` / `getSymbols`; new shared types `EditorSelectionInfo`, `FileDiagnostics`, `DiagnosticInfo`, `SymbolInfo`
+  - +14 vitest tests → **136 total**
+
 - [x] **Final** — `dev → main` PR merged at `522ad3f` (Stages 1–8); Stage 9+ ship via individual PRs against `main`.
 
 ---

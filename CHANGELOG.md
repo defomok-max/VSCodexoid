@@ -5,6 +5,51 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 12: Workspace inspection tools
+
+### Added
+- **5 new built-in tools** wired into `core/tools/builtin/index.ts`,
+  bringing the registry to **20 tools** total. All five are `safe`
+  read-only and were previously advertised by built-in modes
+  (`COMMON_TOOLS`) but never registered, so the agent could not call them:
+  - `get_open_files` — lists files currently open in editors (filters
+    `.nexusignore`).
+  - `get_selection` — returns the active editor's selection (range +
+    selected text), with secret redaction on the captured text.
+  - `get_diagnostics` — surfaces `vscode.languages.getDiagnostics()`
+    output with optional path / minimum-severity filters.
+  - `get_symbols` — returns the document symbol tree for a file via
+    `vscode.executeDocumentSymbolProvider`, with optional name filter.
+  - `get_terminal_output` — replays the last N captures from
+    `run_terminal_command` (newest-first), with stdout/stderr already
+    secret-redacted.
+- `core/tools/uiBridgeAdapter.ts` — host-side glue that wires the new
+  bridge methods to real VS Code APIs (`activeTextEditor`,
+  `languages.getDiagnostics`, `vscode.executeDocumentSymbolProvider`,
+  `SymbolKind` labels). The previous `extension.ts` `getSelection: () =>
+  undefined` stub is replaced with a real implementation.
+- `core/tools/builtin/terminalCapture.ts` — small in-memory ring buffer
+  (16 entries) that `runTerminalCommandTool` writes to on completion.
+  Lets `get_terminal_output` be deterministic and process-local rather
+  than relying on a proposed VS Code terminal-data API.
+- `ToolUiBridge` extended with `getDiagnostics(filePath?)` and
+  `getSymbols(filePath)`. New shared types `EditorSelectionInfo`,
+  `FileDiagnostics`, `DiagnosticInfo`, `SymbolInfo` document the
+  cross-cutting shape.
+- 14 new vitest tests in `tests/workspaceTools.test.ts` cover all five
+  tools end-to-end against a stubbed bridge (open-files filter, selection
+  redaction + range formatting, diagnostics formatting + severity
+  filtering + ignore guard, symbol flattening + container chain + name
+  query, terminal-history newest-first ordering). **Total: 136 tests**
+  passing.
+
+### Changed
+- `runTerminalCommandTool` now records each completed invocation into
+  the new ring buffer in addition to its existing return value.
+- `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` updated to reflect
+  the 20-tool registry, the new `diagnostics` category, and the
+  `uiBridgeAdapter` glue layer.
+
 ## [Unreleased] — Stage 11: Dependabot + tag v0.1.0
 
 ### Added
