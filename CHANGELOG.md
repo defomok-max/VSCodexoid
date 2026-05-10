@@ -5,7 +5,21 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 18: Queue persistence
+## [Unreleased]
+
+### Added
+- **Persisted current-mode preference.** `core/storage/preferencesStore.ts`
+  stores ephemeral UI preferences in VS Code `globalState`. The extension now
+  restores the last selected mode on activation and writes mode changes through
+  the preferences store, so switching to e.g. `architect` no longer resets to
+  `code` after reload.
+- **6 new vitest tests** in `tests/preferencesStore.test.ts`.
+
+### Notes
+- Mode preference intentionally stays out of `nexus.*` settings, avoiding
+  workspace settings churn for a per-user UI choice.
+
+## [0.1.0+stage18] — Stage 18: Queue persistence
 
 ### Added
 - **`QueueStore`** (`src/core/storage/queueStore.ts`) — thin
