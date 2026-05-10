@@ -11,7 +11,14 @@ import type {
   NexusSettings,
 } from "../../shared/types";
 import type { ChatRequest, ChatTool, LLMProvider } from "../providers/providerTypes";
-import type { ToolDefinition, ToolContext, ToolUiBridge, ToolSecurityBridge } from "../tools/toolTypes";
+import type {
+  ToolDefinition,
+  ToolContext,
+  ToolUiBridge,
+  ToolSecurityBridge,
+  ToolCheckpointBridge,
+  ToolFlowBridge,
+} from "../tools/toolTypes";
 import type { ToolRegistry } from "../tools/toolRegistry";
 import { evaluateApproval } from "../approval/approvalManager";
 import { buildDiffPreview } from "../edit/patchEngine";
@@ -37,6 +44,8 @@ export interface AgentRunDeps {
   toolRegistry: ToolRegistry;
   ui: ToolUiBridge;
   security: ToolSecurityBridge;
+  checkpoints: ToolCheckpointBridge;
+  flow: ToolFlowBridge;
   workspaceRoot: string | undefined;
   /** Awaits user decision for an approval request. Resolved by the host. */
   requestApproval: (req: ApprovalRequest) => Promise<ApprovalDecision>;
@@ -200,6 +209,9 @@ export async function* runAgent(opts: AgentRunOptions, deps: AgentRunDeps, abort
         log: () => {},
         ui: deps.ui,
         security: deps.security,
+        checkpoints: deps.checkpoints,
+        flow: deps.flow,
+        taskId: opts.taskId,
       };
       try {
         const result = await tool.execute(parsedArgs as Record<string, unknown>, ctx);

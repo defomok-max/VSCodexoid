@@ -128,6 +128,35 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 16 — Write/build tools**
+  - 4 new built-in tools (`apply_patch`, `format_files`, `run_test_command`, `install_dependency`); registry 29 → **33**
+  - `apply_patch`: structured-hunk apply via `applyHunkMask`, returns `ToolResult.diff` (no direct disk writes); rejects mismatched / overlapping / out-of-range hunks
+  - `format_files` / `run_test_command` / `install_dependency`: shared `runShell` (cwd-bound spawn, secret scrub, terminal capture, abort, 120s timeout); `install_dependency` auto-detects package manager
+  - `run_test_command` uses dynamic `assessCommandRisk` on custom commands
+  - +12 vitest tests → **179 total**
+  - **All mode-manifest gaps closed** — the registry now matches every tool name referenced from `COMMON_TOOLS` / `EDIT_TOOLS` / `SHELL_TOOLS` / `GIT_TOOLS`
+
+- [x] **Stage 15 — Agent flow tools**
+  - 5 new built-in tools (`ask_user`, `show_diff`, `update_todo_list`, `queue_message`, `summarize_session`); registry 24 → 29
+  - `ToolContext` gains `flow: ToolFlowBridge` (with `setTodo` / `enqueue` / `recordSummary`); `AgentRunDeps` threads it through; host wires it via `taskManager` / `queueManager`
+  - `show_diff` reuses the existing `ToolResult.diff → diff/show` pipeline (no new protocol)
+  - +12 vitest tests on a flow-spy → **167 total**
+
+- [x] **Stage 14 — Session persistence**
+  - `SessionStore` activated (was `void`-d since stage 5); recent tasks now survive extension reload via `globalState`
+  - `taskManager.seed(sessionStore.recentTasks())` on activation, `sessionStore.saveTask(stripTransient(task))` on every terminal status transition (`completed`/`failed`/`cancelled`); streaming hot path untouched
+  - `task/clear` message wired: clears both `TaskManager` and `SessionStore`, patches webview
+  - `TaskManager` gains `seed(tasks)` (no `onUpdate` fan-out) and `clear()`
+  - `RunnerDeps` gains `sessionStore: SessionStore`
+  - +9 vitest tests on a Map-backed fake `Memento` → **155 total**
+
+- [x] **Stage 13 — Checkpoint tools**
+  - 4 new built-in tools (`create_checkpoint`, `list_checkpoints`, `restore_checkpoint`, `rollback_checkpoint`); registry 20 → 24
+  - `ToolContext` gains `checkpoints: ToolCheckpointBridge` (+ optional `taskId`); `AgentRunDeps` threads it through; host wires it as a thin pass-through to the existing `CheckpointManager`
+  - Risk: `create_checkpoint` / `list_checkpoints` are `safe`; `restore_checkpoint` / `rollback_checkpoint` are `high` (destructive) — both refuse to write `.nexusignore`d paths
+  - Modes' `EDIT_TOOLS` now also includes `list_checkpoints`
+  - +10 vitest tests on a real `CheckpointManager` → **146 total**
+
 - [x] **Stage 12 — Workspace inspection tools**
   - 5 new built-in tools (`get_open_files`, `get_selection`, `get_diagnostics`, `get_symbols`, `get_terminal_output`) — all `safe` read-only; modes' `COMMON_TOOLS` set is now fully registered (registry grows from 15 → 20)
   - `core/tools/uiBridgeAdapter.ts` — host-side glue wiring `vscode.window.activeTextEditor`, `vscode.languages.getDiagnostics`, and `vscode.executeDocumentSymbolProvider` into the abstract `ToolUiBridge`

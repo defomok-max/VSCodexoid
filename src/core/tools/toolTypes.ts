@@ -53,6 +53,70 @@ export interface ToolContext {
    * Security policy. Tools must consult this before reading / writing files.
    */
   security: ToolSecurityBridge;
+  /**
+   * Checkpoint store; backs the `create_checkpoint` / `restore_checkpoint` /
+   * `rollback_checkpoint` tools.
+   */
+  checkpoints: ToolCheckpointBridge;
+  /**
+   * Agent flow bridge; backs `update_todo_list`, `queue_message`,
+   * `summarize_session` (which mutate the active task / queue).
+   */
+  flow: ToolFlowBridge;
+  /** Identifier of the current task (when invoked from the agent loop). */
+  taskId?: string;
+}
+
+export interface ToolFlowBridge {
+  /** Replace the current task's checklist (used by `update_todo_list`). */
+  setTodo(taskId: string, items: ToolTodoItem[]): void;
+  /**
+   * Append a queued message that will be picked up by the agent runner on
+   * its next idle iteration. Used by `queue_message`.
+   */
+  enqueue(item: ToolQueueItemInput): { id: string; createdAt: number };
+  /**
+   * Record a final summary on the current task; used by `summarize_session`.
+   */
+  recordSummary(taskId: string, summary: string): void;
+}
+
+export interface ToolTodoItem {
+  id: string;
+  text: string;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+}
+
+export interface ToolQueueItemInput {
+  text: string;
+  priority?: number;
+  modeOverride?: string;
+  providerOverride?: string;
+  modelOverride?: string;
+}
+
+export interface ToolCheckpointBridge {
+  /**
+   * Persists a snapshot of the given files. `files[].path` keys are
+   * workspace-relative paths.
+   */
+  create(
+    label: string | undefined,
+    taskId: string | undefined,
+    files: { path: string; content: string }[],
+  ): Promise<CheckpointInfo>;
+  /** Restores the checkpoint to the given workspace root. Returns file count. */
+  restore(id: string, workspaceRoot: string): Promise<number>;
+  /** Returns all known checkpoints, newest first. */
+  list(): CheckpointInfo[];
+}
+
+export interface CheckpointInfo {
+  id: string;
+  taskId?: string;
+  createdAt: number;
+  label?: string;
+  files: { path: string; bytes: number }[];
 }
 
 export interface ToolUiBridge {

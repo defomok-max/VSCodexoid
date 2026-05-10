@@ -24,6 +24,25 @@ import {
   getSymbolsTool,
   getTerminalOutputTool,
 } from "./workspaceTools";
+import {
+  createCheckpointTool,
+  listCheckpointsTool,
+  restoreCheckpointTool,
+  rollbackCheckpointTool,
+} from "./checkpointTools";
+import {
+  askUserTool,
+  queueMessageTool,
+  showDiffTool,
+  summarizeSessionTool,
+  updateTodoListTool,
+} from "./flowTools";
+import {
+  applyPatchTool,
+  formatFilesTool,
+  installDependencyTool,
+  runTestCommandTool,
+} from "./buildTools";
 
 export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(readFileTool);
@@ -50,6 +69,22 @@ export function registerBuiltinTools(reg: ToolRegistry): void {
   reg.register(getDiagnosticsTool);
   reg.register(getSymbolsTool);
   reg.register(getTerminalOutputTool);
+
+  reg.register(createCheckpointTool);
+  reg.register(listCheckpointsTool);
+  reg.register(restoreCheckpointTool);
+  reg.register(rollbackCheckpointTool);
+
+  reg.register(askUserTool);
+  reg.register(showDiffTool);
+  reg.register(updateTodoListTool);
+  reg.register(queueMessageTool);
+  reg.register(summarizeSessionTool);
+
+  reg.register(applyPatchTool);
+  reg.register(formatFilesTool);
+  reg.register(runTestCommandTool);
+  reg.register(installDependencyTool);
 }
 
 export const BUILTIN_TOOL_IDS = [
@@ -73,4 +108,17 @@ export const BUILTIN_TOOL_IDS = [
   "get_diagnostics",
   "get_symbols",
   "get_terminal_output",
+  "create_checkpoint",
+  "list_checkpoints",
+  "restore_checkpoint",
+  "rollback_checkpoint",
+  "ask_user",
+  "show_diff",
+  "update_todo_list",
+  "queue_message",
+  "summarize_session",
+  "apply_patch",
+  "format_files",
+  "run_test_command",
+  "install_dependency",
 ];

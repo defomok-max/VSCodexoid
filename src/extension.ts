@@ -25,7 +25,15 @@ import { runAgent } from "./core/agent/agentRunner";
 import { parseContextRefs, stripContextRefs } from "./core/context/contextRef";
 import { buildContextChunks, packContext } from "./core/context/contextBuilder";
 import { loadNexusRules } from "./core/rules/rulesLoader";
-import type { AppState, ChatMessage, McpToolDescriptor, ModelInfo, ProviderProfile, RiskLevel } from "./shared/types";
+import type {
+  AppState,
+  ChatMessage,
+  McpToolDescriptor,
+  ModelInfo,
+  ProviderProfile,
+  RiskLevel,
+  TaskRecord,
+} from "./shared/types";
 import type { HostToWebview, WebviewToHost } from "./shared/protocol";
 import { logger } from "./core/util/logger";
 import { registerCommands } from "./commands";
@@ -45,7 +53,7 @@ export function activate(context: vscode.ExtensionContext): void {
   logger.info("activating NexusCode Agent");
 
   const settingsStore = new SettingsStore();
-  void SessionStore;
+  const sessionStore = new SessionStore(context.globalState);
   const providerProfileStore = new ProviderProfileStore(context.globalState);
   const providerSecretStore = new ProviderSecretStore(context.secrets);
   const providerRegistry = new ProviderRegistry();
@@ -90,8 +98,21 @@ export function activate(context: vscode.ExtensionContext): void {
   const approvalGate = new ApprovalGate();
   let activeRunController: AbortController | undefined;
 
+  // Hydrate task history from persisted globalState so "recent tasks" survives
+  // an extension reload.
+  taskManager.seed(sessionStore.recentTasks());
+
   taskManager.onUpdate((task) => {
     post({ type: "task/update", task });
+    // Persist when the task reaches a terminal status. Streaming updates would
+    // be too chatty; we save once per terminal transition.
+    if (
+      task.status === "completed" ||
+      task.status === "failed" ||
+      task.status === "cancelled"
+    ) {
+      void sessionStore.saveTask(stripTransient(task));
+    }
   });
   approvalGate.onRequest((req) => {
     post({ type: "approval/request", req });
@@ -168,6 +189,7 @@ export function activate(context: vscode.ExtensionContext): void {
     approvalGate,
     checkpointManager,
     mcpManager,
+    sessionStore,
     workspaceRoot: wsRoot,
     getActiveRun: () => activeRunController,
     setActiveRun: (c: AbortController | undefined) => {
@@ -184,6 +206,22 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push({ dispose: () => void mcpManager.stopAll() });
 
   logger.info("NexusCode Agent activated");
+}
+
+/**
+ * Strips fields that don't survive a reload usefully (in-flight tool args,
+ * partial deltas) before writing to globalState. Reduces persisted payload
+ * size and avoids confusing the UI on rehydrate.
+ */
+function stripTransient(task: TaskRecord): TaskRecord {
+  return {
+    ...task,
+    toolCalls: task.toolCalls.map((c) => ({
+      ...c,
+      // Keep result preview short; full preview was already shown live.
+      resultPreview: c.resultPreview ? c.resultPreview.slice(0, 256) : c.resultPreview,
+    })),
+  };
 }
 
 function buildSecurityBridge(workspaceRoot: string | undefined) {
@@ -211,6 +249,7 @@ interface RunnerDeps {
   approvalGate: ApprovalGate;
   checkpointManager: CheckpointManager;
   mcpManager: McpManager;
+  sessionStore: SessionStore;
   workspaceRoot: string | undefined;
   getActiveRun: () => AbortController | undefined;
   setActiveRun: (c: AbortController | undefined) => void;
@@ -286,6 +325,15 @@ async function handleMessage(msg: WebviewToHost, deps: MessageDeps): Promise<voi
       const c = deps.runnerDeps.getActiveRun();
       if (c) c.abort();
       deps.runnerDeps.approvalGate.cancelAll("stopped");
+      return;
+    }
+    case "task/clear": {
+      deps.runnerDeps.taskManager.clear();
+      await deps.runnerDeps.sessionStore.clear();
+      post({
+        type: "state/patch",
+        patch: { recentTasks: [], currentTask: undefined },
+      });
       return;
     }
     case "approval/decide":
@@ -415,6 +463,31 @@ async function startTask(
           showInputBox: (q) => vscode.window.showInputBox({ prompt: q }),
         }),
         security,
+        checkpoints: {
+          create: (label, taskId, files) =>
+            runnerDeps.checkpointManager.create(label, taskId, files),
+          restore: (id, root) => runnerDeps.checkpointManager.restore(id, root),
+          list: () => runnerDeps.checkpointManager.list(),
+        },
+        flow: {
+          setTodo: (taskId, items) => {
+            runnerDeps.taskManager.setTodo(taskId, items);
+          },
+          enqueue: (item) => {
+            const created = runnerDeps.queueManager.add({
+              text: item.text,
+              priority: item.priority ?? 0,
+              modeOverride: item.modeOverride,
+              providerOverride: item.providerOverride,
+              modelOverride: item.modelOverride,
+            });
+            post({ type: "state/patch", patch: { queue: runnerDeps.queueManager.list() } });
+            return { id: created.id, createdAt: created.createdAt };
+          },
+          recordSummary: (taskId, summary) => {
+            runnerDeps.taskManager.update(taskId, { finalSummary: summary });
+          },
+        },
         workspaceRoot: runnerDeps.workspaceRoot,
         requestApproval: (req) => runnerDeps.approvalGate.request(req),
       },

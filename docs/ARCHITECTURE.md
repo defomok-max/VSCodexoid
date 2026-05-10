@@ -66,7 +66,7 @@ src/
 │   ├─ security/              — IgnoreMatcher, secretScanner, pathGuard
 │   ├─ skills/                — registry, loader, 20 built-in skills
 │   ├─ storage/               — settings (workspace.config) + recent tasks
-│   ├─ tools/                 — ToolRegistry + 20 built-in tools
+│   ├─ tools/                 — ToolRegistry + 33 built-in tools
 │   └─ util/                  — id, logger
 └─ webview/
     ├─ App.tsx                — TopBar / Sidebar / view switcher / ApprovalDialog
@@ -240,16 +240,19 @@ ToolDefinition<I> = {
 }
 ```
 
-20 built-in tools registered in `core/tools/builtin/index.ts`:
+33 built-in tools registered in `core/tools/builtin/index.ts`:
 
 | Category    | Tools |
 |-------------|-------|
 | read        | `read_file`, `list_files`, `get_open_files`, `get_selection`, `get_symbols`, `get_terminal_output` |
 | search      | `search_files`, `grep` |
 | diagnostics | `get_diagnostics` |
-| edit        | `write_file`, `edit_file`, `create_file`, `delete_file`, `rename_file` |
-| shell       | `run_terminal_command` (dynamic risk via `assessCommandRisk`) |
+| edit        | `write_file`, `edit_file`, `create_file`, `delete_file`, `rename_file`, `apply_patch` |
+| shell       | `run_terminal_command` (dynamic risk via `assessCommandRisk`), `run_test_command`, `format_files`, `install_dependency` |
 | git         | `get_git_status`, `get_git_diff`, `create_git_branch`, `stage_files`, `commit_changes` |
+| checkpoint  | `create_checkpoint`, `list_checkpoints`, `restore_checkpoint`, `rollback_checkpoint` |
+| ui          | `ask_user`, `show_diff`, `summarize_session` |
+| todo        | `update_todo_list`, `queue_message` |
 
 Tool execution is sandboxed by `ToolContext`:
 
@@ -504,7 +507,7 @@ scaffold          smoke
 
 1. Build stores: `SettingsStore`, `ProviderProfileStore` (`globalState`),
    `ProviderSecretStore` (`secretStorage`), `ProviderRegistry`.
-2. Build `ToolRegistry`, register the 20 built-in tools.
+2. Build `ToolRegistry`, register the 33 built-in tools.
 3. Build `SkillRegistry`, register the 20 built-in skills, then load any
    project skills from `<workspace>/.nexus/skills`.
 4. Build `McpManager` and wire its `tools`/`status` listeners to webview

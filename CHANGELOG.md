@@ -5,6 +5,174 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — Stage 16: Write/build tools
+
+### Added
+- **4 new built-in tools** in `core/tools/builtin/buildTools.ts`, completing
+  the long-standing gap with mode manifests. Registry **29 → 33**:
+  - `apply_patch` (medium) — applies a structured array of hunks
+    (`{startLineBefore, beforeText, afterText}`) to a single file. The tool
+    re-computes the result via `applyHunkMask` and surfaces a `ToolResult.diff`
+    for the existing approval pipeline; **does not write directly to disk**.
+    Validates each hunk's `beforeText` matches the on-disk content,
+    detects overlapping hunks, refuses ignored / oversized files, and
+    handles missing files (treats as empty `before`).
+  - `format_files` (medium) — runs the project formatter (default
+    `pnpm exec prettier --write`) over the listed workspace-relative paths.
+    Refuses ignored paths up front. Supports a `command` override.
+  - `run_test_command` (low/dynamic) — runs the project test command
+    (default `pnpm test`) with optional `pattern` for filtering. Risk is
+    `assessCommandRisk(...)` when a custom command is given.
+  - `install_dependency` (high) — installs a single npm package via the
+    detected package manager (auto-detect from `pnpm-lock.yaml` /
+    `yarn.lock` / `package-lock.json`, fallback `npm`); supports `dev: true`.
+    The package name is restricted by Zod regex to forbid traversal /
+    arbitrary characters.
+- A shared `runShell` helper inside `buildTools.ts` mirrors
+  `terminalTool.ts`: cwd-bound `spawn`, 64 KiB output cap, secret scrub,
+  `recordTerminalOutput` push so `get_terminal_output` sees these runs too,
+  120s default timeout, abort propagation. Non-zero exit codes surface as
+  `error` so the agent can decide to retry / give up.
+
+### Tests
+- 12 new vitest cases in `tests/buildTools.test.ts`:
+  - `apply_patch`: simple swap, ignored path, mismatched `beforeText`,
+    out-of-range hunk, overlapping hunks, no-op (`after === before`).
+  - `install_dependency`: invalid package-name rejection, scoped name
+    acceptance, abort-before-spawn safety.
+  - `run_test_command` and `format_files`: schema validation +
+    `format_files` ignored-path early refusal.
+- **Total: 167 → 179 tests passing.**
+
+### Notes
+- `apply_patch` mirrors the structure of `DiffHunk` so existing webview diff
+  rendering applies; the per-hunk approve/reject in the diff panel works
+  out of the box.
+- `format_files` and `run_test_command` rely on the workspace already having
+  the relevant binaries (`prettier`, `vitest`, etc.). Auto-installing is
+  intentionally out of scope — the agent should call `install_dependency`
+  separately if needed.
+
+## [Unreleased] — Stage 15: Agent flow tools
+
+### Added
+- **5 new built-in tools** in `core/tools/builtin/flowTools.ts`, bringing the
+  registry to **29 tools**. Closes the second batch of the gap that mode
+  manifests have been advertising since stage 7:
+  - `ask_user` (low) — wraps the existing `ToolUiBridge.askUser` so the agent
+    can prompt the user mid-turn for clarification. Returns `cancelled: true`
+    if the user dismisses the prompt.
+  - `show_diff` (safe) — surfaces a proposed diff via the existing
+    `ToolResult.diff` plumbing **without** writing anything to disk; takes
+    `before`/`after` strings or `beforePath`/`afterPath` workspace-relative
+    paths. Refuses ignored paths and combined payloads >256 KiB.
+  - `update_todo_list` (safe) — replaces the active task's checklist via
+    `taskManager.setTodo`. Validated by Zod (max 64 items, 240-char text,
+    status enum).
+  - `queue_message` (low) — appends a message to the user's queue via
+    `queueManager.add`; supports `priority` (0–10) and `mode` / `provider` /
+    `model` overrides. The agent uses this to defer follow-up work.
+  - `summarize_session` (safe) — records a final markdown summary on the
+    active task (`TaskRecord.finalSummary`).
+- `ToolContext` extended with `flow: ToolFlowBridge` (and the
+  helper types `ToolTodoItem`, `ToolQueueItemInput`).
+- `AgentRunDeps` gains `flow`; `agentRunner` threads it into every
+  `ToolContext`. The host's flow bridge (in `extension.ts`) wraps
+  `taskManager.setTodo` / `taskManager.update({ finalSummary })` /
+  `queueManager.add` and posts `state/patch` for queue updates.
+
+### Tests
+- 12 new vitest cases in `tests/flowTools.test.ts` driving each tool against
+  spies — `ask_user` answer / dismissal, `show_diff` inline / from disk /
+  ignored / oversized, `update_todo_list` happy / no-task, `queue_message`
+  default / overrides, `summarize_session` happy / no-task. All other test
+  files gained a 5-line `flow` stub. **Total: 155 → 167 tests passing.**
+
+### Notes
+- `show_diff` uses the existing `ToolResult.diff → AgentEvent.diff →
+  HostToWebview.diff/show` pipeline; no protocol changes were needed. The
+  webview already supports per-hunk accept/reject for these.
+
+## [Unreleased] — Stage 14: Session persistence
+
+### Added
+- **`SessionStore` is now activated** (it existed since stage 5 but was
+  intentionally idled with `void SessionStore`). Recent tasks now survive an
+  extension reload:
+  - On activation, `taskManager.seed(sessionStore.recentTasks())` rehydrates
+    the in-memory task store from `globalState`.
+  - On every terminal task transition (`completed` / `failed` / `cancelled`),
+    a stripped copy is persisted via `sessionStore.saveTask`.
+  - The streaming hot path is **not** touched — saves only happen once per
+    completed task to keep `globalState` writes cheap.
+- `task/clear` is now wired in the message handler — clears both the in-memory
+  `TaskManager` and persisted `SessionStore`, then patches the webview with
+  empty `recentTasks` / `currentTask`.
+- `TaskManager` gains:
+  - `seed(tasks)` — populate from persisted history without firing
+    `onUpdate` (avoids storming the webview during activation).
+  - `clear()` — drop every task and reset `currentId`.
+- `RunnerDeps` gains `sessionStore: SessionStore` so message handlers can
+  reach it.
+- `stripTransient(task)` helper trims runaway `resultPreview`s (256 char cap)
+  before each persisted write.
+
+### Tests
+- `tests/sessionStore.test.ts` (9 cases) — fake `Memento` Map-backed shim
+  exercises empty-load, save/reload roundtrip, dedup-by-id, newest-first
+  ordering, max truncation, `clear()`, plus 3 cases for
+  `TaskManager.seed`/`clear`. **Total: 146 → 155 tests passing.**
+
+### Notes
+- `SessionStore.saveTask` already had `max = 30` baked in as a parameter; the
+  default is preserved. We could expose it through `nexus.history.maxTasks`
+  setting in a follow-up.
+
+## [Unreleased] — Stage 13: Checkpoint tools
+
+### Added
+- **4 new built-in checkpoint tools** wired into `core/tools/builtin/index.ts`,
+  bringing the registry to **24 tools** total. The agent can now create
+  rollback points before risky edits and restore them autonomously:
+  - `create_checkpoint` (safe) — snapshots the listed workspace files; refuses
+    `.nexusignore`d / oversized (>256 KiB) / binary files.
+  - `list_checkpoints` (safe) — newest-first listing with timestamps, file
+    counts, and labels.
+  - `restore_checkpoint` (high) — restores a specific checkpoint by id;
+    refuses to write any path that's now `.nexusignore`d.
+  - `rollback_checkpoint` (high) — convenience wrapper restoring the most
+    recent checkpoint.
+- `ToolContext` extended with `checkpoints: ToolCheckpointBridge` and an
+  optional `taskId`. New shared interface `CheckpointInfo` mirrors
+  `CheckpointMeta` exactly so the host wiring is a 3-line passthrough to
+  `CheckpointManager`.
+- `AgentRunDeps` gained a `checkpoints` field; `agentRunner` now threads
+  the bridge into every `ToolContext`.
+- `COMMON_TOOLS` in built-in modes adds `list_checkpoints` so editor /
+  shell modes can introspect the rollback history.
+- 10 new vitest cases in `tests/checkpointTools.test.ts` exercising the
+  full lifecycle on a real `CheckpointManager` (create with files,
+  ignored / oversized / binary refusals, label-only marker, ordering,
+  restore reverts files, unknown-id error, rollback restores latest,
+  empty-history error, ring-buffer trim to maxCount). **Total: 136 → 146
+  tests passing.**
+
+### Changed
+- `runTerminalCommandTool`, `agentRunner`, and all tests that build a
+  `ToolContext` now provide a `checkpoints` bridge. Existing tests gained
+  a 4-line stub.
+- Risk levels of `restore_checkpoint` / `rollback_checkpoint` are `high`
+  so they trigger the approval gate under `balanced` / `auto-safe`
+  policies and auto-execute under `full-auto`.
+- `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` reflect the 24-tool
+  registry and the new `checkpoint` category.
+
+### Notes
+- The webview-side checkpoint API (`checkpoint/create`,
+  `checkpoint/restore` protocol messages) is still not handled in
+  `extension.ts` `handleMessage` — that's a UI surfacing gap, separate
+  from this PR (the agent path now works end-to-end).
+
 ## [Unreleased] — Stage 12: Workspace inspection tools
 
 ### Added

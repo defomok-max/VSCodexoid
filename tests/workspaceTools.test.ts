@@ -45,6 +45,16 @@ function buildCtx(opts: BuildCtxOpts = {}): ToolContext {
       resolveWorkspacePath: (p) => (p.startsWith("/") ? p : `/ws/${p}`),
       scanSecrets: (s) => scanSecrets(s),
     },
+    checkpoints: {
+      create: async () => ({ id: "cp_test", createdAt: Date.now(), files: [] }),
+      restore: async () => 0,
+      list: () => [],
+    },
+    flow: {
+      setTodo: () => undefined,
+      enqueue: () => ({ id: "q_test", createdAt: Date.now() }),
+      recordSummary: () => undefined,
+    },
   };
 }
 
