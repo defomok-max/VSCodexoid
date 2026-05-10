@@ -53,6 +53,37 @@ export interface ToolContext {
    * Security policy. Tools must consult this before reading / writing files.
    */
   security: ToolSecurityBridge;
+  /**
+   * Checkpoint store; backs the `create_checkpoint` / `restore_checkpoint` /
+   * `rollback_checkpoint` tools.
+   */
+  checkpoints: ToolCheckpointBridge;
+  /** Identifier of the current task (when invoked from the agent loop). */
+  taskId?: string;
+}
+
+export interface ToolCheckpointBridge {
+  /**
+   * Persists a snapshot of the given files. `files[].path` keys are
+   * workspace-relative paths.
+   */
+  create(
+    label: string | undefined,
+    taskId: string | undefined,
+    files: { path: string; content: string }[],
+  ): Promise<CheckpointInfo>;
+  /** Restores the checkpoint to the given workspace root. Returns file count. */
+  restore(id: string, workspaceRoot: string): Promise<number>;
+  /** Returns all known checkpoints, newest first. */
+  list(): CheckpointInfo[];
+}
+
+export interface CheckpointInfo {
+  id: string;
+  taskId?: string;
+  createdAt: number;
+  label?: string;
+  files: { path: string; bytes: number }[];
 }
 
 export interface ToolUiBridge {

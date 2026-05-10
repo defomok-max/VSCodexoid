@@ -29,6 +29,7 @@ const EDIT_TOOLS = [
   "apply_patch",
   "format_files",
   "create_checkpoint",
+  "list_checkpoints",
   "restore_checkpoint",
   "rollback_checkpoint",
 ];

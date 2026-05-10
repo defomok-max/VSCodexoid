@@ -128,6 +128,13 @@ The final PR target is `dev → main`.
   - Conventional commit prefixes: `deps`, `deps-dev`, `ci`
   - Annotated git tag `v0.1.0` placed on commit `522ad3f` (the original Stages 1–8 release commit)
 
+- [x] **Stage 13 — Checkpoint tools**
+  - 4 new built-in tools (`create_checkpoint`, `list_checkpoints`, `restore_checkpoint`, `rollback_checkpoint`); registry 20 → 24
+  - `ToolContext` gains `checkpoints: ToolCheckpointBridge` (+ optional `taskId`); `AgentRunDeps` threads it through; host wires it as a thin pass-through to the existing `CheckpointManager`
+  - Risk: `create_checkpoint` / `list_checkpoints` are `safe`; `restore_checkpoint` / `rollback_checkpoint` are `high` (destructive) — both refuse to write `.nexusignore`d paths
+  - Modes' `EDIT_TOOLS` now also includes `list_checkpoints`
+  - +10 vitest tests on a real `CheckpointManager` → **146 total**
+
 - [x] **Stage 12 — Workspace inspection tools**
   - 5 new built-in tools (`get_open_files`, `get_selection`, `get_diagnostics`, `get_symbols`, `get_terminal_output`) — all `safe` read-only; modes' `COMMON_TOOLS` set is now fully registered (registry grows from 15 → 20)
   - `core/tools/uiBridgeAdapter.ts` — host-side glue wiring `vscode.window.activeTextEditor`, `vscode.languages.getDiagnostics`, and `vscode.executeDocumentSymbolProvider` into the abstract `ToolUiBridge`
