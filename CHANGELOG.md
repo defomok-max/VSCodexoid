@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   read-only, runnable servers auto-start on activation, and `mcp/save`,
   `mcp/restart`, `mcp/test` handlers manage the running set.
 - **9 new vitest tests** in `tests/mcpLifecycle.test.ts`.
+- **MCP tool execution.** MCP tool descriptors are reconciled into
+  `ToolRegistry` as synthetic network tools, with stable ids/names, standard
+  approval routing, workspace-trust filtering, and abort-aware calls.
+- **12 new vitest tests** in `tests/mcpToolAdapter.test.ts`.
 
 ### Notes
 - Mode preference intentionally stays out of `nexus.*` settings, avoiding
@@ -41,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the explicit allowlist above.
 - `.nexus/mcp.json` accepts either a top-level array or `{ "servers": [...] }`;
   project entries override user entries by id and are never written by the UI.
+- MCP result content is rendered into transcript-safe text markers; image and
+  resource payloads are not inlined.
 
 ## [0.1.0+stage18] — Stage 18: Queue persistence
 

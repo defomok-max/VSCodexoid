@@ -166,6 +166,13 @@ The final PR target is `dev → main`.
   - +9 vitest tests in `tests/mcpLifecycle.test.ts`.
   - Together with Stage 20 (MCP tool execution), this completes the MCP loop: configured server starts on activate → its tools register in `toolRegistry` → agent can call them under mode / skill / workspace-trust filters.
 
+- [x] **Stage 20 — MCP tool execution**
+  - `core/mcp/mcpToolAdapter.ts` — `buildMcpToolDefinition(descriptor, bridge)` returns a `ToolDefinition` proxying to the MCP server. `formatMcpResult` folds multi-block MCP responses into the agent transcript (text joined with `\n\n`, image/resource blocks shown as compact markers — no inline base64).
+  - `core/mcp/mcpToolReconciler.ts` — `reconcileMcpTools(registry, next, bridge)` diffs descriptor sets and applies the minimal `register` / `unregister` calls; returns `{added, removed, kept}` so the host logs a one-line summary on each MCP `tools` event.
+  - `ToolRegistry.unregister(id)` + `ToolRegistry.idsStartingWith(prefix)` — primitives the reconciler needs.
+  - `extension.ts` MCP `tools` listener now also reconciles into `toolRegistry`. The bridge races every `callTool` against the task's `AbortSignal`, so task cancellation aborts in-flight MCP calls instead of waiting them out.
+  - +12 vitest tests in `tests/mcpToolAdapter.test.ts`.
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
