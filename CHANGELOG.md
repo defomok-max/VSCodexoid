@@ -5,7 +5,15 @@ All notable changes to **NexusCode Agent** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — Stage 7: Tests & Docs
+## [Unreleased] — Stage 8: CI
+
+### Added
+- `.github/workflows/ci.yml` — GitHub Actions pipeline running on every push
+  to `main`/`dev` and every PR targeting them. Runs `pnpm install --frozen-lockfile`
+  + `typecheck` + `lint` + `test` + `package`, uploads the produced `.vsix`
+  as a build artifact. Node 20 + pnpm 9 on `ubuntu-latest`, 10-minute timeout.
+
+## [0.1.0-stage7] — Stage 7: Tests & Docs
 
 ### Added
 - `docs/ARCHITECTURE.md` — full architecture reference (process model, source
