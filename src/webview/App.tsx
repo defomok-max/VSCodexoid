@@ -12,6 +12,7 @@ import { UsageView } from "./components/Usage/UsageView";
 import { ApprovalDialog } from "./components/common/ApprovalDialog";
 import { DiffPanel } from "./components/Diff/DiffPanel";
 import { TopBar } from "./components/common/TopBar";
+import { TrustBanner } from "./components/common/TrustBanner";
 
 export function App() {
   const view = useAppStore((s) => s.activeView);
@@ -41,6 +42,7 @@ export function App() {
   return (
     <div className="h-full flex flex-col bg-nexus-bg text-nexus-text">
       <TopBar />
+      <TrustBanner />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
         <main className="flex-1 min-w-0 overflow-hidden">

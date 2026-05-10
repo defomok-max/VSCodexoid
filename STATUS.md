@@ -136,6 +136,13 @@ The final PR target is `dev → main`.
   - +6 vitest tests in `tests/workspaceTrust.test.ts`; existing `tests/agentRunner.test.ts` updated for the new `trusted: true` field on three fake deps → **216 total** passing on top of main (224 once Stage 18 lands)
   - Fixes the `docs/SECURITY` promise that "untrusted workspaces disable shell tools entirely" — `vscode.workspace.isTrusted` was previously not read anywhere
 
+- [x] **Stage 22 — Workspace-trust UI banner**
+  - `webview/components/common/TrustBanner.tsx` — persistent amber banner under TopBar when `state.workspaceTrusted === false`. "Manage trust" button opens the built-in `workbench.trust.manage` dialog via the `command/run` round-trip.
+  - `core/security/commandAllowlist.ts` — `ALLOWED_WEBVIEW_COMMANDS` set (`workbench.trust.manage`, `workbench.action.openSettings`, `workbench.action.reloadWindow`) + `isAllowedWebviewCommand(cmd)` helper.
+  - `extension.ts` `command/run` handler (was declared in Stage 1 but never wired) — consults the allowlist, calls `vscode.commands.executeCommand`, surfaces failures as toasts.
+  - +5 vitest tests in `tests/commandAllowlist.test.ts`. **221 total** on top of stage-19 (216 + 5).
+  - Stacks on Stage 19. Once Stage 19 lands on `main`, this PR rebases trivially.
+
 - [x] **Stage 17d — Multimodal / image input**
   - `AttachmentRef` extended with inline `dataBase64` + optional `name` so chat messages carry image bytes through the protocol without a side channel.
   - New `core/providers/util/multimodal.ts` helpers: `imageAttachments`, `hasImages`, `toOpenAIContentBlocks`, `toAnthropicImageBlocks`, `toGeminiParts`. Pure functions, fully unit-tested.
