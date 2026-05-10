@@ -17,6 +17,7 @@ import type {
   ToolUiBridge,
   ToolSecurityBridge,
   ToolCheckpointBridge,
+  ToolFlowBridge,
 } from "../tools/toolTypes";
 import type { ToolRegistry } from "../tools/toolRegistry";
 import { evaluateApproval } from "../approval/approvalManager";
@@ -44,6 +45,7 @@ export interface AgentRunDeps {
   ui: ToolUiBridge;
   security: ToolSecurityBridge;
   checkpoints: ToolCheckpointBridge;
+  flow: ToolFlowBridge;
   workspaceRoot: string | undefined;
   /** Awaits user decision for an approval request. Resolved by the host. */
   requestApproval: (req: ApprovalRequest) => Promise<ApprovalDecision>;
@@ -208,6 +210,7 @@ export async function* runAgent(opts: AgentRunOptions, deps: AgentRunDeps, abort
         ui: deps.ui,
         security: deps.security,
         checkpoints: deps.checkpoints,
+        flow: deps.flow,
         taskId: opts.taskId,
       };
       try {

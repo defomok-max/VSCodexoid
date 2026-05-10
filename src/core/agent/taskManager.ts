@@ -39,6 +39,22 @@ export class TaskManager {
     return this.currentId ? this.tasks.get(this.currentId) : undefined;
   }
 
+  /**
+   * Seeds the in-memory store from persisted history (e.g. SessionStore).
+   * No `update` events are fired — this is intended for activation only.
+   */
+  seed(tasks: TaskRecord[]): void {
+    for (const t of tasks) {
+      if (!this.tasks.has(t.id)) this.tasks.set(t.id, t);
+    }
+  }
+
+  /** Drops every task and clears the current pointer. */
+  clear(): void {
+    this.tasks.clear();
+    this.currentId = undefined;
+  }
+
   get(id: string): TaskRecord | undefined {
     return this.tasks.get(id);
   }
